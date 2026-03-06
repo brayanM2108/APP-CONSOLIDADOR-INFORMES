@@ -136,21 +136,51 @@ def procesar_base(
             df[col] = ""
 
     # ── Columnas extra ───────────────────────────────────────
-    # Se adjuntan después de las estándar, tal como vienen en el Excel.
+    # Soporta dos formatos:
+    #   - string simple:         "Columna Normal"
+    #   - dict con alias:        {"col": "VALOR.1", "alias": "valor_final"}
     # Solo aparecen en el reporte de ese tipo de base.
     columnas_extra = config.get("columnas_extra", [])
     extras_encontradas = []
 
-    for col_extra in columnas_extra:
-        if col_extra in df_raw.columns:
-            df[col_extra] = df_raw[col_extra].reset_index(drop=True)
-            extras_encontradas.append(col_extra)
+    for item in columnas_extra:
+        # Resolver col_real y alias según el formato
+        if isinstance(item, dict):
+            col_real = item.get("col", "")
+            alias    = item.get("alias", col_real)
         else:
-            df[col_extra] = ""
+            col_real = item
+            alias    = item
+
+        if not col_real:
+            continue
+
+        if col_real in df_raw.columns:
+            df[alias] = df_raw[col_real].reset_index(drop=True)
+            extras_encontradas.append(alias)
+        else:
+            df[alias] = ""
             advertencias.append(
-                f"Columna extra '{col_extra}' no encontrada en '{nombre_archivo}'. "
-                f"Se agregó vacía."
+                f"Columna extra '{col_real}' no encontrada en '{nombre_archivo}'. "
+                f"Se agregó vacía como '{alias}'."
             )
 
     columnas_finales = COLUMNAS + extras_encontradas
     return df[columnas_finales], advertencias
+
+
+def columnas_reales(df_raw: pd.DataFrame) -> list[str]:
+    """
+    Retorna los nombres exactos de las columnas tal como los ve pandas,
+    incluyendo las renombradas por duplicados (VALOR, VALOR.1, VALOR.2).
+    Útil para configurar alias en columnas duplicadas.
+    """
+    return df_raw.columns.tolist()
+
+
+def leer_excel_con_duplicados(archivo) -> pd.DataFrame:
+    """
+    Lee un Excel conservando todas las columnas aunque estén duplicadas.
+    Pandas las renombra automáticamente: VALOR, VALOR.1, VALOR.2...
+    """
+    return pd.read_excel(archivo, header=0)
