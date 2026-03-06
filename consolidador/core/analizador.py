@@ -86,17 +86,34 @@ def detalle_pendientes(df: pd.DataFrame, convenio: str | None = None) -> pd.Data
     """
     Detalle fila a fila de los registros pendientes.
     Si se pasa convenio, filtra por ese convenio.
+    Incluye columnas extra si existen.
     """
+    from .procesador import COLUMNAS
+
     df_pend = df[df["estado"] == "Pendiente"].copy()
 
     if convenio and convenio != "Todos":
         df_pend = df_pend[df_pend["nombre_convenio"] == convenio]
 
-    return df_pend[[
+    # Columnas base del detalle
+    cols_base = [
         "nombre_convenio", "tipo_base", "documento_paciente",
         "nombre_paciente", "descripcion_servicio",
         "facturador", "observacion", "archivo_origen",
-    ]]
+    ]
+
+    # Agregar columnas extra (las que no son estándar)
+    cols_extra = [c for c in df_pend.columns if c not in COLUMNAS]
+    return df_pend[cols_base + cols_extra]
+
+
+def columnas_extra_de(df: pd.DataFrame, tipo_base: str) -> list[str]:
+    """
+    Retorna las columnas extra que tiene un tipo de base especifico.
+    """
+    from .procesador import COLUMNAS
+    df_tipo = df[df["tipo_base"] == tipo_base]
+    return [c for c in df_tipo.columns if c not in COLUMNAS]
 
 
 def convenios_disponibles(df: pd.DataFrame) -> list[str]:
