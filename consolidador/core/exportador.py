@@ -87,10 +87,26 @@ def tipo_base_csv(df: pd.DataFrame, tipo_base: str) -> bytes:
 
 
 def tipo_base_excel(df: pd.DataFrame, tipo_base: str) -> bytes:
+    from .procesador import COLUMNAS
     df_t = df[df["tipo_base"] == tipo_base]
+
+    # Columnas extra de este tipo de base
+    cols_extra = [c for c in df_t.columns if c not in COLUMNAS]
+
+    # Detalle pendientes con columnas extra incluidas
+    cols_detalle = [
+        "nombre_convenio", "tipo_base", "documento_paciente",
+        "nombre_paciente", "descripcion_servicio",
+        "facturador", "observacion", "archivo_origen",
+    ] + cols_extra
+
+    df_pend = df_t[df_t["estado"] == "Pendiente"]
+    # Solo seleccionar cols que existen
+    cols_detalle = [c for c in cols_detalle if c in df_pend.columns]
+
     return _excel({
         "Resumen":             resumen_por_convenio(df_t),
-        "Detalle Pendientes":  df_t[df_t["estado"] == "Pendiente"],
+        "Detalle Pendientes":  df_pend[cols_detalle],
         "Todos los registros": df_t,
     })
 
