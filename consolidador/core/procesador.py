@@ -93,7 +93,10 @@ def procesar_base(
     advertencias = []
 
     # Detectar columnas faltantes
-    cols_config = {k: v for k, v in config.items() if isinstance(v, str)}
+    # Solo validar claves que son nombres de columnas (empiezan con "col_")
+    # Excluir claves de configuración como "logica_facturacion", "columnas_extra"
+    cols_config = {k: v for k, v in config.items()
+                   if k.startswith("col_") and isinstance(v, str)}
     for clave, col_real in cols_config.items():
         if col_real not in df_raw.columns:
             advertencias.append(f"Columna '{col_real}' ({clave}) no encontrada en '{nombre_archivo}'")
@@ -127,9 +130,27 @@ def procesar_base(
     df["mes"]            = mes
     df["año"]            = año
 
-    # Garantizar orden de columnas
+    # Garantizar orden de columnas estándar
     for col in COLUMNAS:
         if col not in df.columns:
             df[col] = ""
 
-    return df[COLUMNAS], advertencias
+    # ── Columnas extra ───────────────────────────────────────
+    # Se adjuntan después de las estándar, tal como vienen en el Excel.
+    # Solo aparecen en el reporte de ese tipo de base.
+    columnas_extra = config.get("columnas_extra", [])
+    extras_encontradas = []
+
+    for col_extra in columnas_extra:
+        if col_extra in df_raw.columns:
+            df[col_extra] = df_raw[col_extra].reset_index(drop=True)
+            extras_encontradas.append(col_extra)
+        else:
+            df[col_extra] = ""
+            advertencias.append(
+                f"Columna extra '{col_extra}' no encontrada en '{nombre_archivo}'. "
+                f"Se agregó vacía."
+            )
+
+    columnas_finales = COLUMNAS + extras_encontradas
+    return df[columnas_finales], advertencias
