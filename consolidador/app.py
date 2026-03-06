@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from core.procesador import procesar_base, COLUMNAS
+from core.procesador import procesar_base, COLUMNAS, columnas_reales, leer_excel_con_duplicados
 from core.analizador import (
     kpis_globales,
     resumen_por_convenio,
@@ -160,11 +160,13 @@ with st.sidebar:
                 texto_exacto = st.text_input("¿Cuál es ese texto?")
 
             st.markdown("**Columnas adicionales** *(opcional)*")
+            st.caption("Una por línea. Para columnas duplicadas usa formato: nombre_en_excel → alias")
             cols_extra_input = st.text_area(
-                "Una columna por línea",
-                placeholder="Codigo IPS\nAutorizacion\nValor Servicio",
-                help="Columnas extra que quieres conservar tal como vienen en el Excel. "
-                     "Solo aparecerán en el reporte de este tipo de base."
+                "Columnas extra",
+                placeholder="Codigo IPS\nAutorizacion\nVALOR → valor_inicial\nVALOR.1 → valor_final",
+                help="Columnas simples: escribe el nombre exacto.\n"
+                     "Columnas duplicadas: usa NOMBRE_EXCEL → alias_unico",
+                label_visibility="collapsed"
             )
 
             if st.form_submit_button("💾 Guardar", type="primary", use_container_width=True):
@@ -173,11 +175,21 @@ with st.sidebar:
                 else:
                     logica_valor = texto_exacto if logica_label == "Texto exacto (ej: FAC, SI, RADICADO)" else LOGICAS[logica_label]
 
-                    # Parsear columnas extra: una por línea, ignorar vacías
-                    columnas_extra = [
-                        c.strip() for c in cols_extra_input.splitlines()
-                        if c.strip()
-                    ]
+                    # Parsear columnas extra
+                    # Formato simple:  "Columna Normal"
+                    # Formato alias:   "VALOR.1 → valor_final"
+                    columnas_extra = []
+                    for linea in cols_extra_input.splitlines():
+                        linea = linea.strip()
+                        if not linea:
+                            continue
+                        if "→" in linea:
+                            partes = linea.split("→")
+                            col_real = partes[0].strip()
+                            alias    = partes[1].strip()
+                            columnas_extra.append({"col": col_real, "alias": alias})
+                        else:
+                            columnas_extra.append(linea)
 
                     st.session_state.config[nombre_tipo] = {
                         "col_paciente":       col_pac,
@@ -198,6 +210,40 @@ with st.sidebar:
     if st.session_state.config:
         st.divider()
         st.caption(f"💾 Config guardado en: `{CONFIG_PATH}`")
+
+    # ── Inspector de columnas ────────────────────────────────
+    st.divider()
+    with st.expander("🔍 Inspeccionar columnas de un archivo"):
+        st.caption(
+            "Sube un archivo para ver exactamente cómo pandas nombra sus columnas. "
+            "Útil para identificar columnas duplicadas (VALOR, VALOR.1, VALOR.2...)"
+        )
+        f_inspect = st.file_uploader(
+            "Archivo a inspeccionar", type=["xlsx", "xls"], key="inspector"
+        )
+        if f_inspect:
+            try:
+                df_inspect = leer_excel_con_duplicados(f_inspect)
+                cols = columnas_reales(df_inspect)
+
+                # Detectar duplicados originales (antes del renombrado de pandas)
+                duplicados = {c for c in cols if c.split(".")[0] != c and
+                              c.split(".")[0] in cols}
+
+                st.markdown(f"**{len(cols)} columnas encontradas:**")
+                for i, col in enumerate(cols):
+                    es_dup = any(col.startswith(f"{base}.") for base in
+                                [c for c in cols if not "." in c])
+                    if es_dup:
+                        st.markdown(
+                            f'`{col}` <span style="color:#d97706;font-size:0.78rem">'
+                            f'⚠️ duplicada — usa alias</span>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(f"`{col}`")
+            except Exception as e:
+                st.error(f"Error al leer el archivo: {e}")
 
 
 # ════════════════════════════════════════════════════════════
