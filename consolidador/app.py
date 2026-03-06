@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime
+from pathlib import Path
 
 from core.procesador import procesar_base, COLUMNAS
 from core.analizador import (
@@ -89,10 +90,34 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
+# ── Ruta del config ──────────────────────────────────────────
+CONFIG_PATH = Path("config/config.json")
+
+
+def _guardar_config(config: dict):
+    """Persiste el config en disco automáticamente."""
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
+
+
 # ── Estado de sesión ─────────────────────────────────────────
-if "config"       not in st.session_state: st.session_state.config       = {}
 if "df_resultado" not in st.session_state: st.session_state.df_resultado = None
 if "mes_label"    not in st.session_state: st.session_state.mes_label    = ""
+
+# Cargar config desde disco al arrancar (solo una vez)
+if "config" not in st.session_state:
+    if CONFIG_PATH.exists():
+        try:
+            st.session_state.config = json.loads(
+                CONFIG_PATH.read_text(encoding="utf-8")
+            )
+        except Exception:
+            st.session_state.config = {}
+    else:
+        st.session_state.config = {}
 
 
 # ════════════════════════════════════════════════════════════
@@ -101,19 +126,14 @@ if "mes_label"    not in st.session_state: st.session_state.mes_label    = ""
 with st.sidebar:
     st.markdown("## ⚙️ Configuración")
 
-    f_config = st.file_uploader("Cargar config.json", type=["json"])
-    if f_config:
-        try:
-            st.session_state.config = json.load(f_config)
-            st.success(f"✅ {len(st.session_state.config)} tipo(s) cargados")
-        except Exception as e:
-            st.error(f"config.json inválido: {e}")
-
+    # Indicador de estado del config
     if st.session_state.config:
-        st.divider()
-        st.markdown("**Tipos de base activos:**")
+        st.success(f"✅ {len(st.session_state.config)} tipo(s) activos")
+        st.markdown("**Tipos de base:**")
         for nombre in st.session_state.config:
             st.markdown(f'<span class="badge">{nombre}</span>', unsafe_allow_html=True)
+    else:
+        st.warning("⚠️ Sin tipos de base configurados")
 
     st.divider()
 
@@ -139,11 +159,26 @@ with st.sidebar:
             if logica_label == "Texto exacto (ej: FAC, SI, RADICADO)":
                 texto_exacto = st.text_input("¿Cuál es ese texto?")
 
+            st.markdown("**Columnas adicionales** *(opcional)*")
+            cols_extra_input = st.text_area(
+                "Una columna por línea",
+                placeholder="Codigo IPS\nAutorizacion\nValor Servicio",
+                help="Columnas extra que quieres conservar tal como vienen en el Excel. "
+                     "Solo aparecerán en el reporte de este tipo de base."
+            )
+
             if st.form_submit_button("💾 Guardar", type="primary", use_container_width=True):
                 if not nombre_tipo or not col_pac or not col_fact:
                     st.error("Nombre, doc. paciente y col. facturación son obligatorios.")
                 else:
                     logica_valor = texto_exacto if logica_label == "Texto exacto (ej: FAC, SI, RADICADO)" else LOGICAS[logica_label]
+
+                    # Parsear columnas extra: una por línea, ignorar vacías
+                    columnas_extra = [
+                        c.strip() for c in cols_extra_input.splitlines()
+                        if c.strip()
+                    ]
+
                     st.session_state.config[nombre_tipo] = {
                         "col_paciente":       col_pac,
                         "col_nombre":         col_nom  or None,
@@ -154,20 +189,15 @@ with st.sidebar:
                         "col_observacion":    col_obs  or None,
                         "col_facturacion":    col_fact,
                         "logica_facturacion": logica_valor,
+                        "columnas_extra":     columnas_extra,
                     }
-                    st.success(f"✅ '{nombre_tipo}' guardado")
+                    _guardar_config(st.session_state.config)
+                    st.success(f"✅ '{nombre_tipo}' guardado en config/config.json")
                     st.rerun()
 
     if st.session_state.config:
         st.divider()
-        st.download_button(
-            "⬇️ Descargar config.json",
-            data=json.dumps(st.session_state.config, ensure_ascii=False, indent=2).encode("utf-8"),
-            file_name="config.json",
-            mime="application/json",
-            use_container_width=True,
-        )
-        st.caption("Guárdalo para reutilizarlo el próximo mes.")
+        st.caption(f"💾 Config guardado en: `{CONFIG_PATH}`")
 
 
 # ════════════════════════════════════════════════════════════
@@ -178,7 +208,7 @@ st.markdown('<p class="subtit">Consolida bases heterogéneas e identifica servic
 st.markdown("<br>", unsafe_allow_html=True)
 
 if not st.session_state.config:
-    st.info("👈 Carga tu **config.json** o crea los tipos de base en el panel izquierdo.")
+    st.info("👈 Crea los tipos de base en el panel izquierdo para comenzar. El config se guarda automáticamente.")
     st.stop()
 
 tab_cargar, tab_reporte = st.tabs(["📁 Cargar archivos", "📊 Reporte"])
@@ -217,15 +247,6 @@ with tab_cargar:
             ca, cb = st.columns([3, 4])
             with ca:
                 st.markdown(f"📄 `{archivo.name}`")
-                try:
-                    archivo.seek(0)
-                    df_preview = pd.read_excel(archivo, nrows=0)
-                    cols_detectadas = list(df_preview.columns)
-                    with st.expander("🔍 Ver columnas detectadas"):
-                        for c in cols_detectadas:
-                            st.code(c)
-                except Exception:
-                    pass
             with cb:
                 tipo = st.selectbox(
                     "tipo", tipos_disponibles,
