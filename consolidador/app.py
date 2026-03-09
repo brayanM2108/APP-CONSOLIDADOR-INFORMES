@@ -25,6 +25,8 @@ from core.exportador import (
     nombre_general,
     nombre_convenio_archivo,
     nombre_tipo_base_archivo,
+    guardar_parquet,
+    meses_disponibles_parquet,
 )
 
 # ── Constantes ───────────────────────────────────────────────
@@ -211,6 +213,31 @@ with st.sidebar:
         st.divider()
         st.caption(f"💾 Config guardado en: `{CONFIG_PATH}`")
 
+    # ── Historial de meses guardados ────────────────────────
+    st.divider()
+    with st.expander("📅 Historial de meses guardados"):
+        meses = meses_disponibles_parquet()
+        if not meses:
+            st.caption("Aún no hay meses guardados.")
+        else:
+            st.caption(f"{len(meses)} mes(es) en el historial:")
+            for m in meses:
+                col_m, col_b = st.columns([3, 2])
+                with col_m:
+                    st.markdown(f"📦 `{m}`")
+                with col_b:
+                    if st.button("Cargar", key=f"cargar_{m}"):
+                        try:
+                            from core.exportador import cargar_parquet
+                            df_hist = cargar_parquet(m.replace(" ", "_"))
+                            if df_hist is not None:
+                                st.session_state.df_resultado = df_hist
+                                st.session_state.mes_label = m.replace(" ", "_")
+                                st.success(f"✅ {m} cargado")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
     # ── Inspector de columnas ────────────────────────────────
     st.divider()
     with st.expander("🔍 Inspeccionar columnas de un archivo"):
@@ -353,7 +380,17 @@ with tab_cargar:
             st.session_state.df_resultado = pd.concat(dfs, ignore_index=True)
             st.session_state.mes_label    = f"{MESES[mes_sel]}_{int(año_sel)}"
             total = len(st.session_state.df_resultado)
-            st.success(f"✅ {total:,} registros procesados. Ve a la pestaña **📊 Reporte**.")
+
+            # Guardar automáticamente en Parquet
+            try:
+                ruta = guardar_parquet(
+                    st.session_state.df_resultado,
+                    st.session_state.mes_label
+                )
+                st.success(f"✅ {total:,} registros procesados y guardados en `{ruta}`. Ve a **📊 Reporte**.")
+            except Exception as e:
+                st.success(f"✅ {total:,} registros procesados. Ve a **📊 Reporte**.")
+                st.warning(f"⚠️ No se pudo guardar en Parquet: {e}. Instala pyarrow con `pip install pyarrow`.")
         else:
             st.error("No se pudo procesar ningún archivo.")
 
