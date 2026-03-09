@@ -5,6 +5,8 @@ No sabe nada de interfaz ni de exportación.
 """
 
 import pandas as pd
+import unicodedata
+import re
 
 # Esquema estándar de salida
 COLUMNAS = [
@@ -15,7 +17,7 @@ COLUMNAS = [
     "fecha_atencion",
     "facturador",
     "observacion",
-    "estado",            # "Facturado" | "Pendiente" | "Sin información"
+    "estado",
     "valor_estado_original",
     "tipo_base",
     "nombre_convenio",
@@ -103,7 +105,7 @@ def procesar_base(
 
     # Construir DataFrame estándar
     df = pd.DataFrame()
-    df["documento_paciente"]   = _mapear_columna(df_raw, config.get("col_paciente"))
+    df["documento_paciente"]   = _limpiar_texto(_mapear_columna(df_raw, config.get("col_paciente")))
     df["nombre_paciente"]      = _mapear_columna(df_raw, config.get("col_nombre"))
     df["cups"]                 = _mapear_columna(df_raw, config.get("col_cups"))
     df["descripcion_servicio"] = _mapear_columna(df_raw, config.get("col_servicio"))
@@ -184,3 +186,22 @@ def leer_excel_con_duplicados(archivo) -> pd.DataFrame:
     Pandas las renombra automáticamente: VALOR, VALOR.1, VALOR.2...
     """
     return pd.read_excel(archivo, header=0)
+
+
+def _limpiar_texto(serie: pd.Series) -> pd.Series:
+    """
+    Elimina espacios especiales unicode y caracteres no imprimibles.
+    Normaliza a texto plano limpio.
+    """
+
+    def limpiar(val):
+        if pd.isna(val):
+            return ""
+        texto = str(val)
+        # Normalizar unicode y eliminar caracteres de control/espacios especiales
+        texto = unicodedata.normalize("NFKC", texto)
+        # Eliminar caracteres no imprimibles y espacios especiales (U+2002, U+00A0, etc.)
+        texto = re.sub(r'[^\x20-\x7E\u00C0-\u024F\u00B0-\u00BF]', '', texto)
+        return texto.strip()
+
+    return serie.apply(limpiar)
