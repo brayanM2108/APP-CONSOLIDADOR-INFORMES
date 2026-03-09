@@ -246,18 +246,22 @@ def guardar_parquet(df: pd.DataFrame, mes_label: str) -> Path:
     PARQUET_DIR.mkdir(parents=True, exist_ok=True)
     ruta = PARQUET_DIR / f"consolidado_{_nombre_seguro(mes_label)}.parquet"
 
-    df_guardar = df.copy()
+    def _limpiar(df_in):
+        df_out = df_in.copy()
+        for col in df_out.columns:
+            if df_out[col].dtype == object:
+                df_out[col] = df_out[col].fillna("").astype(str)
+        return df_out
 
-    # Convertir TODAS las columnas object a str puro
-    # Esto previene que PyArrow falle al inferir tipos en columnas mixtas
-    # (ej: "85916577-86339775", valores con espacios unicode, etc.)
-    for col in df_guardar.columns:
-        if df_guardar[col].dtype == object:
-            df_guardar[col] = df_guardar[col].fillna("").astype(str)
+    # Si ya existe el mes, combinar con lo nuevo
+    if ruta.exists():
+        df_existente = pd.read_parquet(ruta, engine="pyarrow")
+        df_final = pd.concat([df_existente, df], ignore_index=True)
+    else:
+        df_final = df
 
-    df_guardar.to_parquet(ruta, index=False, engine="pyarrow")
+    _limpiar(df_final).to_parquet(ruta, index=False, engine="pyarrow")
     return ruta
-
 
 def cargar_parquet(mes_label: str) -> pd.DataFrame | None:
     """
