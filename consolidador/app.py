@@ -11,6 +11,11 @@ from datetime import datetime
 from pathlib import Path
 
 from core.procesador import procesar_base, COLUMNAS, columnas_reales, leer_excel_con_duplicados
+from core.watcher import (
+    escanear, archivos_nuevos, archivos_procesados,
+    marcar_procesado, desmarcar_procesado,
+    MESES_NOMBRE,
+)
 from core.analizador import (
     kpis_globales,
     resumen_por_convenio,
@@ -26,6 +31,7 @@ from core.exportador import (
     nombre_convenio_archivo,
     nombre_tipo_base_archivo,
     guardar_parquet,
+    cargar_todos_parquet,
     meses_disponibles_parquet,
 )
 
@@ -213,14 +219,67 @@ with st.sidebar:
         st.divider()
         st.caption(f"💾 Config guardado en: `{CONFIG_PATH}`")
 
-    # ── Historial de meses guardados ────────────────────────
+    # ── Carpeta de datos y mapeo ────────────────────────────
     st.divider()
+    with st.expander("📁 Carpeta de datos y mapeo"):
+        carpeta_datos = st.text_input(
+            "Ruta de la carpeta raíz",
+            value=st.session_state.get("carpeta_datos", ""),
+            placeholder="C:/Users/tu_usuario/datos",
+            key="input_carpeta_datos"
+        )
+        if carpeta_datos:
+            st.session_state["carpeta_datos"] = carpeta_datos
+
+        st.markdown("**Mapeo carpeta → tipo de base**")
+        st.caption("Escribe: NOMBRE_CARPETA → Tipo en config (una por línea)")
+
+        mapeo_actual = st.session_state.config.get("carpeta_tipo_base", {})
+        mapeo_texto  = "\n".join(f"{k} → {v}" for k, v in mapeo_actual.items())
+
+        mapeo_input = st.text_area(
+            "Mapeo",
+            value=mapeo_texto,
+            placeholder="CABEZOTE → CAPITALSALUD - Cabezote\nLABORATORIO → CAPITALSALUD - Laboratorio",
+            label_visibility="collapsed",
+        )
+
+        if st.button("💾 Guardar mapeo", use_container_width=True):
+            nuevo_mapeo = {}
+            for linea in mapeo_input.splitlines():
+                linea = linea.strip()
+                if "→" in linea:
+                    partes = linea.split("→")
+                    nuevo_mapeo[partes[0].strip()] = partes[1].strip()
+            st.session_state.config["carpeta_tipo_base"] = nuevo_mapeo
+            _guardar_config(st.session_state.config)
+            st.success("✅ Mapeo guardado")
+            st.rerun()
+
+    # ── Historial de meses guardados ────────────────────────
     with st.expander("📅 Historial de meses guardados"):
         meses = meses_disponibles_parquet()
         if not meses:
             st.caption("Aún no hay meses guardados.")
         else:
             st.caption(f"{len(meses)} mes(es) en el historial:")
+
+            # Filtro por convenio
+            try:
+                from core.exportador import cargar_todos_parquet
+
+                df_todos = cargar_todos_parquet()
+                convenios_hist = ["Todos"] + sorted(df_todos["nombre_convenio"].unique()) if df_todos is not None else [
+                    "Todos"]
+            except Exception:
+                convenios_hist = ["Todos"]
+
+            filtro_conv = st.selectbox(
+                "Filtrar por convenio",
+                convenios_hist,
+                key="filtro_hist_convenio"
+            )
+
             for m in meses:
                 col_m, col_b = st.columns([3, 2])
                 with col_m:
@@ -229,11 +288,15 @@ with st.sidebar:
                     if st.button("Cargar", key=f"cargar_{m}"):
                         try:
                             from core.exportador import cargar_parquet
+
                             df_hist = cargar_parquet(m.replace(" ", "_"))
                             if df_hist is not None:
+                                # Aplicar filtro de convenio si está seleccionado
+                                if filtro_conv != "Todos":
+                                    df_hist = df_hist[df_hist["nombre_convenio"] == filtro_conv]
                                 st.session_state.df_resultado = df_hist
                                 st.session_state.mes_label = m.replace(" ", "_")
-                                st.success(f"✅ {m} cargado")
+                                st.success(f"✅ {m} cargado" + (f" · {filtro_conv}" if filtro_conv != "Todos" else ""))
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -248,19 +311,19 @@ with st.sidebar:
         f_inspect = st.file_uploader(
             "Archivo a inspeccionar", type=["xlsx", "xls"], key="inspector"
         )
-        if f_inspect:
+        if f_inspect is not None:
             try:
                 df_inspect = leer_excel_con_duplicados(f_inspect)
                 cols = columnas_reales(df_inspect)
 
-                # Detectar duplicados originales (antes del renombrado de pandas)
-                duplicados = {c for c in cols if c.split(".")[0] != c and
-                              c.split(".")[0] in cols}
+                # Filtrar valores nulos y convertir todo a string
+                cols = [str(c) for c in cols if c is not None and str(c) != "nan"]
+
+                bases_sin_punto = [c for c in cols if "." not in c]
 
                 st.markdown(f"**{len(cols)} columnas encontradas:**")
-                for i, col in enumerate(cols):
-                    es_dup = any(col.startswith(f"{base}.") for base in
-                                [c for c in cols if not "." in c])
+                for col in cols:
+                    es_dup = any(col.startswith(f"{base}.") for base in bases_sin_punto)
                     if es_dup:
                         st.markdown(
                             f'`{col}` <span style="color:#d97706;font-size:0.78rem">'
@@ -269,9 +332,10 @@ with st.sidebar:
                         )
                     else:
                         st.markdown(f"`{col}`")
+
+                st.info("ℹ️ Este archivo no se procesará ni guardará. Solo se muestran sus columnas.")
             except Exception as e:
                 st.error(f"Error al leer el archivo: {e}")
-
 
 # ════════════════════════════════════════════════════════════
 # CONTENIDO PRINCIPAL
@@ -284,7 +348,154 @@ if not st.session_state.config:
     st.info("👈 Crea los tipos de base en el panel izquierdo para comenzar. El config se guarda automáticamente.")
     st.stop()
 
-tab_cargar, tab_reporte = st.tabs(["📁 Cargar archivos", "📊 Reporte"])
+tab_archivos, tab_cargar, tab_reporte = st.tabs(["📂 Archivos del mes", "📁 Cargar manual", "📊 Reporte"])
+
+
+# ════════════════════════════════════════════════════════════
+# TAB 0 — ARCHIVOS DEL MES (WATCHER)
+# ════════════════════════════════════════════════════════════
+with tab_archivos:
+
+    st.subheader("Archivos del mes")
+
+    carpeta_raiz = st.session_state.get("carpeta_datos", "")
+    if not carpeta_raiz:
+        st.info("👈 Define la carpeta raíz de datos en el panel izquierdo.")
+        st.stop()
+
+    # Selector de mes
+    w1, w2 = st.columns(2)
+    with w1:
+        mes_w = st.selectbox("Mes", list(MESES.keys()),
+                             index=datetime.now().month - 1,
+                             format_func=lambda x: MESES[x],
+                             key="mes_watcher")
+    with w2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔍 Escanear carpeta", use_container_width=True):
+            st.session_state["archivos_escaneados"] = escanear(
+                carpeta_raiz,
+                mes_w,
+                st.session_state.config.get("carpeta_tipo_base", {}),
+            )
+
+    archivos_scan = st.session_state.get("archivos_escaneados", [])
+
+    if "archivos_escaneados" not in st.session_state:
+        st.info("📂 Presiona **Escanear** para detectar archivos del mes.")
+    elif not archivos_scan:
+        st.warning(f"⚠️ No se encontraron archivos de **{MESES[mes_w]}** en `{carpeta_raiz}`. Verifica que la carpeta exista y que los archivos contengan el nombre del mes.")
+    else:
+        nuevos     = archivos_nuevos(archivos_scan)
+        procesados = archivos_procesados(archivos_scan)
+
+        if not nuevos and not procesados:
+            st.warning("⚠️ No se encontraron archivos para este mes.")
+        elif not nuevos:
+            st.success(f"✅ Todos los archivos de **{MESES[mes_w]}** ya fueron procesados.")
+        else:
+            st.info(f"🆕 **{len(nuevos)}** archivo(s) nuevo(s) · ✅ **{len(procesados)}** ya procesado(s)")
+
+        # ── Archivos nuevos ──────────────────────────────────
+        if nuevos:
+            st.markdown("#### 🆕 Archivos nuevos")
+            tipos_disponibles_w = ["— Selecciona —"] + [
+                k for k in st.session_state.config.keys()
+                if k != "carpeta_tipo_base"
+            ]
+            seleccionados = []
+
+            for arch in nuevos:
+                col_chk, col_info, col_tipo = st.columns([0.5, 3, 3])
+                with col_chk:
+                    sel = st.checkbox("", key=f"sel_{arch.ruta}", value=bool(arch.tipo_base))
+                with col_info:
+                    st.markdown(f"📄 `{arch.nombre}`")
+                    st.caption(f"{arch.convenio} / {arch.tipo_carpeta}")
+                with col_tipo:
+                    # Preseleccionar si hay mapeo
+                    idx = 0
+                    if arch.tipo_base and arch.tipo_base in tipos_disponibles_w:
+                        idx = tipos_disponibles_w.index(arch.tipo_base)
+                    tipo_sel_w = st.selectbox(
+                        "tipo", tipos_disponibles_w,
+                        index=idx,
+                        key=f"tipow_{arch.ruta}",
+                        label_visibility="collapsed",
+                    )
+                    if sel and tipo_sel_w != "— Selecciona —":
+                        seleccionados.append((arch, tipo_sel_w))
+
+            st.divider()
+
+            puede_procesar_w = len(seleccionados) > 0
+            if st.button("▶️ Procesar seleccionados", type="primary",
+                         disabled=not puede_procesar_w, use_container_width=True):
+
+                dfs_w        = []
+                advertencias_w = []
+                errores_w    = []
+                progress_w   = st.progress(0)
+
+                for i, (arch, tipo_base_w) in enumerate(seleccionados):
+                    config_base_w = st.session_state.config.get(tipo_base_w, {})
+                    try:
+                        df_raw_w = pd.read_excel(arch.ruta)
+                        df_proc_w, warns_w = procesar_base(
+                            df_raw_w, config_base_w,
+                            arch.nombre, tipo_base_w,
+                            arch.mes, arch.año,
+                        )
+                        dfs_w.append(df_proc_w)
+                        advertencias_w.extend(warns_w)
+                        marcar_procesado(arch.ruta, tipo_base_w)
+                    except Exception as e:
+                        errores_w.append(f"**{arch.nombre}**: {e}")
+                    progress_w.progress((i + 1) / len(seleccionados))
+
+                progress_w.empty()
+
+                if advertencias_w:
+                    with st.expander(f"⚠️ {len(advertencias_w)} advertencia(s)"):
+                        for w in advertencias_w:
+                            st.markdown(f"- {w}")
+                if errores_w:
+                    with st.expander(f"❌ {len(errores_w)} error(es)"):
+                        for e in errores_w:
+                            st.markdown(f"- {e}")
+
+                if dfs_w:
+                    st.session_state.df_resultado = pd.concat(dfs_w, ignore_index=True)
+                    st.session_state.mes_label    = f"{MESES[mes_w]}_{seleccionados[0][0].año}"
+                    total_w = len(st.session_state.df_resultado)
+                    try:
+                        ruta_p = guardar_parquet(st.session_state.df_resultado, st.session_state.mes_label)
+                        st.success(f"✅ {total_w:,} registros procesados y guardados. Ve a **📊 Reporte**.")
+                    except Exception:
+                        st.success(f"✅ {total_w:,} registros procesados. Ve a **📊 Reporte**.")
+                    # Refrescar escaneo
+                    st.session_state["archivos_escaneados"] = escanear(
+                        carpeta_raiz, mes_w,
+                        st.session_state.config.get("carpeta_tipo_base", {}),
+                    )
+                    st.rerun()
+
+        # ── Archivos ya procesados ───────────────────────────
+        if procesados:
+            with st.expander(f"✅ {len(procesados)} ya procesado(s)"):
+                for arch in procesados:
+                    col_i, col_r = st.columns([4, 2])
+                    with col_i:
+                        st.markdown(f"📄 `{arch.nombre}`")
+                        st.caption(f"{arch.convenio} · {arch.procesado_el}")
+                    with col_r:
+                        if st.button("↩️ Reprocesar", key=f"reproc_{arch.ruta}"):
+                            desmarcar_procesado(arch.ruta)
+                            st.session_state["archivos_escaneados"] = escanear(
+                                carpeta_raiz, mes_w,
+                                st.session_state.config.get("carpeta_tipo_base", {}),
+                            )
+                            st.rerun()
 
 
 # ════════════════════════════════════════════════════════════
@@ -377,8 +588,17 @@ with tab_cargar:
                     st.markdown(f"- {e}")
 
         if dfs:
-            st.session_state.df_resultado = pd.concat(dfs, ignore_index=True)
-            st.session_state.mes_label    = f"{MESES[mes_sel]}_{int(año_sel)}"
+            df_nuevos  = pd.concat(dfs, ignore_index=True)
+            mes_nuevo  = f"{MESES[mes_sel]}_{int(año_sel)}"
+            # Acumular con lo que ya había en sesión si es el mismo mes
+            if (st.session_state.df_resultado is not None and
+                    st.session_state.mes_label == mes_nuevo):
+                st.session_state.df_resultado = pd.concat(
+                    [st.session_state.df_resultado, df_nuevos], ignore_index=True
+                )
+            else:
+                st.session_state.df_resultado = df_nuevos
+            st.session_state.mes_label = mes_nuevo
             total = len(st.session_state.df_resultado)
 
             # Guardar automáticamente en Parquet
