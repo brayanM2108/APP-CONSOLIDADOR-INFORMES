@@ -257,6 +257,7 @@ with st.sidebar:
             st.rerun()
 
     # ── Historial de meses guardados ────────────────────────
+    st.divider()
     with st.expander("📅 Historial de meses guardados"):
         meses = meses_disponibles_parquet()
         if not meses:
@@ -267,10 +268,8 @@ with st.sidebar:
             # Filtro por convenio
             try:
                 from core.exportador import cargar_todos_parquet
-
                 df_todos = cargar_todos_parquet()
-                convenios_hist = ["Todos"] + sorted(df_todos["nombre_convenio"].unique()) if df_todos is not None else [
-                    "Todos"]
+                convenios_hist = ["Todos"] + sorted(df_todos["nombre_convenio"].unique().tolist()) if df_todos is not None else ["Todos"]
             except Exception:
                 convenios_hist = ["Todos"]
 
@@ -288,15 +287,16 @@ with st.sidebar:
                     if st.button("Cargar", key=f"cargar_{m}"):
                         try:
                             from core.exportador import cargar_parquet
-
                             df_hist = cargar_parquet(m.replace(" ", "_"))
                             if df_hist is not None:
-                                # Aplicar filtro de convenio si está seleccionado
                                 if filtro_conv != "Todos":
                                     df_hist = df_hist[df_hist["nombre_convenio"] == filtro_conv]
                                 st.session_state.df_resultado = df_hist
                                 st.session_state.mes_label = m.replace(" ", "_")
-                                st.success(f"✅ {m} cargado" + (f" · {filtro_conv}" if filtro_conv != "Todos" else ""))
+                                label = f"✅ {m} cargado"
+                                if filtro_conv != "Todos":
+                                    label += f" · {filtro_conv}"
+                                st.success(label)
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -311,19 +311,19 @@ with st.sidebar:
         f_inspect = st.file_uploader(
             "Archivo a inspeccionar", type=["xlsx", "xls"], key="inspector"
         )
-        if f_inspect is not None:
+        if f_inspect:
             try:
                 df_inspect = leer_excel_con_duplicados(f_inspect)
                 cols = columnas_reales(df_inspect)
 
-                # Filtrar valores nulos y convertir todo a string
-                cols = [str(c) for c in cols if c is not None and str(c) != "nan"]
-
-                bases_sin_punto = [c for c in cols if "." not in c]
+                # Detectar duplicados originales (antes del renombrado de pandas)
+                duplicados = {c for c in cols if c.split(".")[0] != c and
+                              c.split(".")[0] in cols}
 
                 st.markdown(f"**{len(cols)} columnas encontradas:**")
-                for col in cols:
-                    es_dup = any(col.startswith(f"{base}.") for base in bases_sin_punto)
+                for i, col in enumerate(cols):
+                    es_dup = any(col.startswith(f"{base}.") for base in
+                                [c for c in cols if not "." in c])
                     if es_dup:
                         st.markdown(
                             f'`{col}` <span style="color:#d97706;font-size:0.78rem">'
@@ -332,10 +332,9 @@ with st.sidebar:
                         )
                     else:
                         st.markdown(f"`{col}`")
-
-                st.info("ℹ️ Este archivo no se procesará ni guardará. Solo se muestran sus columnas.")
             except Exception as e:
                 st.error(f"Error al leer el archivo: {e}")
+
 
 # ════════════════════════════════════════════════════════════
 # CONTENIDO PRINCIPAL
@@ -496,6 +495,28 @@ with tab_archivos:
                                 st.session_state.config.get("carpeta_tipo_base", {}),
                             )
                             st.rerun()
+
+    # ── Bases consolidadas ───────────────────────────────────
+    st.divider()
+    st.markdown("#### 📊 Bases consolidadas")
+
+    from core.exportador import cargar_todos_parquet
+    df_total = cargar_todos_parquet()
+
+    if df_total is None:
+        st.caption("Aún no hay bases guardadas en el historial.")
+    else:
+        convenios_total = sorted(df_total["nombre_convenio"].unique().tolist())
+        conv_filtro = st.selectbox(
+            "Convenio", convenios_total, key="bases_conv_filtro"
+        )
+
+        df_conv  = df_total[df_total["nombre_convenio"] == conv_filtro]
+        archivos_conv = sorted(df_conv["archivo_origen"].unique().tolist())
+
+        st.caption(f"{len(archivos_conv)} archivo(s) consolidado(s) para **{conv_filtro}**:")
+        for a in archivos_conv:
+            st.markdown(f'<span class="badge">📄 {a}</span>', unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════
