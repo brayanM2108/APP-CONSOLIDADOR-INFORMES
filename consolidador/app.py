@@ -114,6 +114,7 @@ def _guardar_config(config: dict):
 # ── Estado de sesión ─────────────────────────────────────────
 if "df_resultado" not in st.session_state: st.session_state.df_resultado = None
 if "mes_label"    not in st.session_state: st.session_state.mes_label    = ""
+if "modo_reporte" not in st.session_state: st.session_state.modo_reporte  = "mes"
 
 # Cargar config desde disco al arrancar (solo una vez)
 if "config" not in st.session_state:
@@ -256,50 +257,43 @@ with st.sidebar:
             st.success("✅ Mapeo guardado")
             st.rerun()
 
-    # ── Historial de meses guardados ────────────────────────
+    # ── Cargar desde historial ──────────────────────────────
     st.divider()
-    with st.expander("📅 Historial de meses guardados"):
-        meses = meses_disponibles_parquet()
-        if not meses:
-            st.caption("Aún no hay meses guardados.")
+    with st.expander("📅 Cargar desde historial"):
+        from core.exportador import cargar_parquet, cargar_todos_parquet
+
+        df_hist_all = cargar_todos_parquet()
+        meses_disp  = meses_disponibles_parquet()
+
+        if df_hist_all is None or not meses_disp:
+            st.caption("Aún no hay datos guardados.")
         else:
-            st.caption(f"{len(meses)} mes(es) en el historial:")
-
-            # Filtro por convenio
-            try:
-                from core.exportador import cargar_todos_parquet
-                df_todos = cargar_todos_parquet()
-                convenios_hist = ["Todos"] + sorted(df_todos["nombre_convenio"].unique().tolist()) if df_todos is not None else ["Todos"]
-            except Exception:
-                convenios_hist = ["Todos"]
-
-            filtro_conv = st.selectbox(
-                "Filtrar por convenio",
-                convenios_hist,
-                key="filtro_hist_convenio"
+            modo_carga = st.radio(
+                "Cargar por", ["Mes", "Convenio"],
+                horizontal=True, key="modo_carga_hist"
             )
 
-            for m in meses:
-                col_m, col_b = st.columns([3, 2])
-                with col_m:
-                    st.markdown(f"📦 `{m}`")
-                with col_b:
-                    if st.button("Cargar", key=f"cargar_{m}"):
-                        try:
-                            from core.exportador import cargar_parquet
-                            df_hist = cargar_parquet(m.replace(" ", "_"))
-                            if df_hist is not None:
-                                if filtro_conv != "Todos":
-                                    df_hist = df_hist[df_hist["nombre_convenio"] == filtro_conv]
-                                st.session_state.df_resultado = df_hist
-                                st.session_state.mes_label = m.replace(" ", "_")
-                                label = f"✅ {m} cargado"
-                                if filtro_conv != "Todos":
-                                    label += f" · {filtro_conv}"
-                                st.success(label)
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {e}")
+            if modo_carga == "Mes":
+                mes_sel_h = st.selectbox("Mes", meses_disp, key="hist_mes_sel")
+                if st.button("📥 Cargar mes", use_container_width=True, key="btn_cargar_mes"):
+                    df_cargado = cargar_parquet(mes_sel_h.replace(" ", "_"))
+                    if df_cargado is not None:
+                        st.session_state.df_resultado  = df_cargado
+                        st.session_state.mes_label     = mes_sel_h.replace(" ", "_")
+                        st.session_state.modo_reporte  = "mes"
+                        st.success(f"✅ {mes_sel_h} cargado")
+                        st.rerun()
+
+            else:  # Por convenio
+                convenios_disp = sorted(df_hist_all["nombre_convenio"].unique().tolist())
+                conv_sel_h = st.selectbox("Convenio", convenios_disp, key="hist_conv_sel")
+                if st.button("📥 Cargar convenio", use_container_width=True, key="btn_cargar_conv"):
+                    df_conv_h = df_hist_all[df_hist_all["nombre_convenio"] == conv_sel_h].copy()
+                    st.session_state.df_resultado  = df_conv_h
+                    st.session_state.mes_label     = conv_sel_h
+                    st.session_state.modo_reporte  = "convenio"
+                    st.success(f"✅ {conv_sel_h} cargado ({len(df_conv_h):,} registros)")
+                    st.rerun()
 
     # ── Inspector de columnas ────────────────────────────────
     st.divider()
@@ -481,7 +475,8 @@ with tab_archivos:
                         )
                     else:
                         st.session_state.df_resultado = df_nuevos_w
-                    st.session_state.mes_label = mes_nuevo_w
+                    st.session_state.mes_label    = mes_nuevo_w
+                    st.session_state.modo_reporte = "mes"
                     total_w = len(st.session_state.df_resultado)
                     try:
                         ruta_p = guardar_parquet(st.session_state.df_resultado, mes_nuevo_w)
@@ -542,8 +537,40 @@ with tab_archivos:
         archivos_conv = sorted(df_conv["archivo_origen"].unique().tolist())
 
         st.caption(f"{len(archivos_conv)} archivo(s) consolidado(s) para **{conv_filtro}**:")
+
         for a in archivos_conv:
-            st.markdown(f'<span class="badge">📄 {a}</span>', unsafe_allow_html=True)
+            col_a, col_btn = st.columns([5, 1])
+            with col_a:
+                st.markdown(f'<span class="badge">📄 {a}</span>', unsafe_allow_html=True)
+            with col_btn:
+                if st.button("🗑️", key=f"del_{a}", help=f"Eliminar {a}"):
+                    st.session_state[f"confirm_del_{a}"] = True
+
+            # Confirmación inline
+            if st.session_state.get(f"confirm_del_{a}"):
+                st.warning(f"⚠️ ¿Eliminar **{a}** del Parquet permanentemente?")
+                col_si, col_no = st.columns(2)
+                with col_si:
+                    if st.button("✅ Sí, eliminar", key=f"si_{a}", type="primary", use_container_width=True):
+                        from core.exportador import eliminar_archivo_de_parquet
+                        resultado = eliminar_archivo_de_parquet(a)
+                        if resultado["error"]:
+                            st.error(f"Error: {resultado['error']}")
+                        else:
+                            st.session_state.pop(f"confirm_del_{a}", None)
+                            # Limpiar sesión si el archivo estaba cargado
+                            if st.session_state.df_resultado is not None:
+                                df_actual = st.session_state.df_resultado
+                                st.session_state.df_resultado = df_actual[
+                                    df_actual["archivo_origen"] != a
+                                ].reset_index(drop=True) or None
+                            meses_txt = ", ".join(resultado["meses_afectados"]) or "ninguno"
+                            st.success(f"✅ {resultado['eliminados']:,} registros eliminados · Meses afectados: {meses_txt}")
+                            st.rerun()
+                with col_no:
+                    if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
+                        st.session_state.pop(f"confirm_del_{a}", None)
+                        st.rerun()
 
 
 # ════════════════════════════════════════════════════════════
@@ -649,7 +676,8 @@ with tab_cargar:
                 )
             else:
                 st.session_state.df_resultado = df_nuevos
-            st.session_state.mes_label = mes_nuevo
+            st.session_state.mes_label    = mes_nuevo
+            st.session_state.modo_reporte = "mes"
             total = len(st.session_state.df_resultado)
 
             try:
@@ -673,170 +701,304 @@ with tab_cargar:
 
 
 # ════════════════════════════════════════════════════════════
-# TAB 2 — REPORTE
+# TAB 2 — REPORTE (unificado: por mes o por convenio)
 # ════════════════════════════════════════════════════════════
 with tab_reporte:
 
-    df_total = st.session_state.df_resultado
+    df_total    = st.session_state.df_resultado
+    modo        = st.session_state.get("modo_reporte", "mes")
+    mes_label   = st.session_state.mes_label
 
     if df_total is None or df_total.empty:
-        st.info("Procesa los archivos primero en la pestaña **📁 Cargar archivos**.")
+        st.info("Carga datos desde el historial o procesa archivos primero.")
         st.stop()
 
-    mes_label = st.session_state.mes_label
+    # ════════════════════════════════════════════════════════
+    # MODO MES — filtro por convenio
+    # ════════════════════════════════════════════════════════
+    if modo == "mes":
 
-    # ── Filtro por convenio ───────────────────────────────────
-    opciones_conv = ["Todos"] + sorted(df_total["nombre_convenio"].unique().tolist())
-    conv_reporte  = st.selectbox(
-        "📌 Convenio", opciones_conv, key="filtro_conv_reporte"
-    )
-    df = df_total if conv_reporte == "Todos" else df_total[df_total["nombre_convenio"] == conv_reporte]
+        opciones_conv = ["Todos"] + sorted(df_total["nombre_convenio"].unique().tolist())
+        conv_reporte  = st.selectbox("📌 Convenio", opciones_conv, key="filtro_conv_reporte")
+        df = df_total if conv_reporte == "Todos" else df_total[df_total["nombre_convenio"] == conv_reporte]
 
-    if df.empty:
-        st.warning("No hay registros para el convenio seleccionado.")
-        st.stop()
+        if df.empty:
+            st.warning("No hay registros para el convenio seleccionado.")
+            st.stop()
 
-    # ── KPIs ─────────────────────────────────────────────────
-    kpis      = kpis_globales(df)
-    pct       = kpis["cumplimiento"]
-    color_pct = "verde" if pct >= 80 else "naranja" if pct >= 50 else "rojo"
+        # ── KPIs ─────────────────────────────────────────────
+        kpis      = kpis_globales(df)
+        pct       = kpis["cumplimiento"]
+        color_pct = "verde" if pct >= 80 else "naranja" if pct >= 50 else "rojo"
 
-    k1, k2, k3, k4, k5 = st.columns(5)
-    for col, num, label, color in [
-        (k1, f"{kpis['total']:,}",      "Total registros", "azul"),
-        (k2, f"{kpis['facturados']:,}", "Facturados",       "verde"),
-        (k3, f"{kpis['pendientes']:,}", "Pendientes",       "rojo"),
-        (k4, f"{kpis['sin_info']:,}",   "Sin información",  "gris"),
-        (k5, f"{pct}%",                 "Cumplimiento",     color_pct),
-    ]:
-        col.markdown(f"""<div class="kpi">
-            <div class="kpi-num {color}">{num}</div>
-            <div class="kpi-label">{label}</div>
-        </div>""", unsafe_allow_html=True)
+        k1, k2, k3, k4, k5 = st.columns(5)
+        for col, num, label, color in [
+            (k1, f"{kpis['total']:,}",      "Total registros", "azul"),
+            (k2, f"{kpis['facturados']:,}", "Facturados",       "verde"),
+            (k3, f"{kpis['pendientes']:,}", "Pendientes",       "rojo"),
+            (k4, f"{kpis['sin_info']:,}",   "Sin información",  "gris"),
+            (k5, f"{pct}%",                   "Cumplimiento",     color_pct),
+        ]:
+            col.markdown(f"""<div class="kpi">
+                <div class="kpi-num {color}">{num}</div>
+                <div class="kpi-label">{label}</div>
+            </div>""", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Resumen por convenio ──────────────────────────────────
-    st.subheader("📋 Resumen por convenio")
-    rc = resumen_por_convenio(df)
-    if not rc.empty:
+        # ── Resumen por convenio ──────────────────────────────
+        st.subheader("📋 Resumen por convenio")
+        rc = resumen_por_convenio(df)
+        if not rc.empty:
+            st.dataframe(
+                rc.style.background_gradient(
+                    subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
+                ),
+                use_container_width=True, hide_index=True,
+            )
+
+        st.divider()
+
+        # ── Pendientes por facturador ─────────────────────────
+        st.subheader("👤 Pendientes por facturador")
+        rf = pendientes_por_facturador(df)
+        if rf.empty:
+            st.success("🎉 No hay pendientes.")
+        else:
+            st.dataframe(rf, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ── Detalle pendientes ────────────────────────────────
+        st.subheader("⚠️ Detalle de pendientes")
+        df_pend = df[df["estado"] == "Pendiente"]
+        if df_pend.empty:
+            st.success("🎉 No hay registros pendientes.")
+        else:
+            convs  = ["Todos"] + convenios_disponibles(df_pend)
+            filtro = st.selectbox("Filtrar por convenio", convs, key="det_conv_mes")
+            df_det = detalle_pendientes(df, filtro)
+            st.caption(f"{len(df_det):,} registros")
+            st.dataframe(df_det, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ── Descargas 3 niveles ───────────────────────────────
+        st.subheader("⬇️ Descargar reportes")
+
+        st.markdown('''<div class="nivel-header">
+            <div class="nivel-titulo">📊 Nivel 1 — Reporte general</div>
+            <div class="nivel-desc">Todos los convenios y tipos de base consolidados</div>
+        </div>''', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button("⬇️ General CSV", data=general_csv(df),
+                file_name=nombre_general(mes_label, "csv"), mime="text/csv", use_container_width=True)
+        with col2:
+            st.download_button("⬇️ General Excel", data=general_excel(df),
+                file_name=nombre_general(mes_label, "xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.markdown('''<div class="nivel-header">
+            <div class="nivel-titulo">🏥 Nivel 2 — Por convenio</div>
+            <div class="nivel-desc">Reporte individual de cada convenio</div>
+        </div>''', unsafe_allow_html=True)
+        convenios = convenios_disponibles(df)
+        conv_sel  = st.selectbox("Selecciona el convenio", convenios, key="conv_desc")
+        col3, col4 = st.columns(2)
+        with col3:
+            st.download_button(f"⬇️ {conv_sel} CSV", data=convenio_csv(df, conv_sel),
+                file_name=nombre_convenio_archivo(conv_sel, mes_label, "csv"),
+                mime="text/csv", use_container_width=True)
+        with col4:
+            st.download_button(f"⬇️ {conv_sel} Excel", data=convenio_excel(df, conv_sel),
+                file_name=nombre_convenio_archivo(conv_sel, mes_label, "xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.markdown('''<div class="nivel-header">
+            <div class="nivel-titulo">🗂️ Nivel 3 — Por tipo de base</div>
+            <div class="nivel-desc">Reporte individual de cada tipo de base</div>
+        </div>''', unsafe_allow_html=True)
+        tipos_disponibles_rep = sorted(df["tipo_base"].unique().tolist())
+        tipo_sel = st.selectbox("Selecciona el tipo de base", tipos_disponibles_rep, key="tipo_desc")
+        col5, col6 = st.columns(2)
+        with col5:
+            st.download_button(f"⬇️ {tipo_sel} CSV", data=tipo_base_csv(df, tipo_sel),
+                file_name=nombre_tipo_base_archivo(tipo_sel, mes_label, "csv"),
+                mime="text/csv", use_container_width=True)
+        with col6:
+            st.download_button(f"⬇️ {tipo_sel} Excel", data=tipo_base_excel(df, tipo_sel),
+                file_name=nombre_tipo_base_archivo(tipo_sel, mes_label, "xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+
+    # ════════════════════════════════════════════════════════
+    # MODO CONVENIO — filtro por rango de meses
+    # ════════════════════════════════════════════════════════
+    else:
+
+        def _orden_mes(row):
+            return str(row["año"]) + "_" + str(row["mes"]).zfill(2)
+
+        def _label_mes(clave):
+            año_m, mes_m = clave.split("_")
+            nombre = {v: k for k, v in MESES_NOMBRE.items()}.get(mes_m, mes_m)
+            return f"{nombre.capitalize()} {año_m}"
+
+        df_total["_orden"] = df_total.apply(_orden_mes, axis=1)
+        meses_ord  = sorted(df_total["_orden"].unique().tolist())
+        meses_labs = [_label_mes(m) for m in meses_ord]
+
+        st.caption(f"Convenio: **{mes_label}** · {len(meses_labs)} mes(es) disponibles")
+
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            desde = st.selectbox("Desde", meses_labs, index=0, key="conv_desde")
+        with col_d2:
+            hasta = st.selectbox("Hasta", meses_labs, index=len(meses_labs)-1, key="conv_hasta")
+
+        idx_d = meses_labs.index(desde)
+        idx_h = meses_labs.index(hasta)
+
+        if idx_d > idx_h:
+            st.warning("⚠️ 'Desde' debe ser anterior o igual a 'Hasta'.")
+            st.stop()
+
+        claves_sel = meses_ord[idx_d:idx_h+1]
+        df = df_total[df_total["_orden"].isin(claves_sel)].drop(columns=["_orden"])
+
+        if df.empty:
+            st.warning("No hay registros para el rango seleccionado.")
+            st.stop()
+
+        st.caption(f"**{len(df):,}** registros · {desde} → {hasta}")
+        st.divider()
+
+        # ── KPIs ─────────────────────────────────────────────
+        kpis      = kpis_globales(df)
+        pct       = kpis["cumplimiento"]
+        color_pct = "verde" if pct >= 80 else "naranja" if pct >= 50 else "rojo"
+
+        k1, k2, k3, k4, k5 = st.columns(5)
+        for col, num, label, color in [
+            (k1, f"{kpis['total']:,}",      "Total registros", "azul"),
+            (k2, f"{kpis['facturados']:,}", "Facturados",       "verde"),
+            (k3, f"{kpis['pendientes']:,}", "Pendientes",       "rojo"),
+            (k4, f"{kpis['sin_info']:,}",   "Sin información",  "gris"),
+            (k5, f"{pct}%",                   "Cumplimiento",     color_pct),
+        ]:
+            col.markdown(f"""<div class="kpi">
+                <div class="kpi-num {color}">{num}</div>
+                <div class="kpi-label">{label}</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── Resumen por mes ───────────────────────────────────
+        st.subheader("📋 Resumen por mes")
+        df["mes_label"] = df.apply(
+            lambda r: _label_mes(str(r["año"]) + "_" + str(r["mes"]).zfill(2)), axis=1
+        )
+        resumen_mes = (
+            df.groupby("mes_label")["estado"]
+            .value_counts().unstack(fill_value=0).reset_index()
+        )
+        for c in ["Facturado", "Pendiente", "Sin información"]:
+            if c not in resumen_mes.columns:
+                resumen_mes[c] = 0
+        resumen_mes["Total"] = resumen_mes[["Facturado","Pendiente","Sin información"]].sum(axis=1)
+        resumen_mes["Cumplimiento (%)"] = (resumen_mes["Facturado"] / resumen_mes["Total"] * 100).round(1)
         st.dataframe(
-            rc.style.background_gradient(
+            resumen_mes.style.background_gradient(
                 subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
             ),
             use_container_width=True, hide_index=True,
         )
 
-    st.divider()
+        st.divider()
 
-    # ── Pendientes por facturador ─────────────────────────────
-    st.subheader("👤 Pendientes por facturador")
-    rf = pendientes_por_facturador(df)
-    if rf.empty:
-        st.success("🎉 No hay pendientes.")
-    else:
-        st.dataframe(rf, use_container_width=True, hide_index=True)
+        # ── Pendientes por facturador ─────────────────────────
+        st.subheader("👤 Pendientes por facturador")
+        rf = pendientes_por_facturador(df)
+        if rf.empty:
+            st.success("🎉 No hay pendientes.")
+        else:
+            st.dataframe(rf, use_container_width=True, hide_index=True)
 
-    st.divider()
+        st.divider()
 
-    # ── Detalle pendientes ────────────────────────────────────
-    st.subheader("⚠️ Detalle de pendientes")
-    df_pend = df[df["estado"] == "Pendiente"]
+        # ── Detalle pendientes ────────────────────────────────
+        st.subheader("⚠️ Detalle de pendientes")
+        df_pend = df[df["estado"] == "Pendiente"]
+        if df_pend.empty:
+            st.success("🎉 No hay registros pendientes.")
+        else:
+            cols_det = [
+                "mes_label", "tipo_base", "documento_paciente", "nombre_paciente",
+                "descripcion_servicio", "facturador", "observacion", "archivo_origen",
+            ]
+            cols_det = [c for c in cols_det if c in df_pend.columns]
+            st.caption(f"{len(df_pend):,} registros pendientes")
+            st.dataframe(df_pend[cols_det], use_container_width=True, hide_index=True)
 
-    if df_pend.empty:
-        st.success("🎉 No hay registros pendientes.")
-    else:
-        convs  = ["Todos"] + convenios_disponibles(df_pend)
-        filtro = st.selectbox("Filtrar por convenio", convs)
-        df_det = detalle_pendientes(df, filtro)
-        st.caption(f"{len(df_det):,} registros")
-        st.dataframe(df_det, use_container_width=True, hide_index=True)
+        st.divider()
 
-    st.divider()
+        # ── Descargas 3 niveles ───────────────────────────────
+        st.subheader("⬇️ Descargar reportes")
+        label_h = f"{mes_label}_{desde.replace(' ','_')}_a_{hasta.replace(' ','_')}"
 
-    # ════════════════════════════════════════════════════════
-    # DESCARGAS — 3 niveles
-    # ════════════════════════════════════════════════════════
-    st.subheader("⬇️ Descargar reportes")
+        st.markdown('''<div class="nivel-header">
+            <div class="nivel-titulo">📊 Nivel 1 — Reporte general</div>
+            <div class="nivel-desc">Todos los tipos de base del convenio en el rango</div>
+        </div>''', unsafe_allow_html=True)
+        col1h, col2h = st.columns(2)
+        with col1h:
+            st.download_button("⬇️ General CSV", data=general_csv(df),
+                file_name=f"historico_{label_h}.csv",
+                mime="text/csv", use_container_width=True)
+        with col2h:
+            st.download_button("⬇️ General Excel", data=general_excel(df),
+                file_name=f"historico_{label_h}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True)
 
-    # ── Nivel 1: General ─────────────────────────────────────
-    st.markdown("""<div class="nivel-header">
-        <div class="nivel-titulo">📊 Nivel 1 — Reporte general</div>
-        <div class="nivel-desc">Todos los convenios y tipos de base consolidados</div>
-    </div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            "⬇️ General CSV",
-            data=general_csv(df),
-            file_name=nombre_general(mes_label, "csv"),
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with col2:
-        st.download_button(
-            "⬇️ General Excel",
-            data=general_excel(df),
-            file_name=nombre_general(mes_label, "xlsx"),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
+        st.markdown('''<div class="nivel-header">
+            <div class="nivel-titulo">🏥 Nivel 2 — Por convenio</div>
+            <div class="nivel-desc">Reporte del convenio seleccionado</div>
+        </div>''', unsafe_allow_html=True)
+        convenios_h2 = convenios_disponibles(df)
+        conv_sel_h   = st.selectbox("Selecciona el convenio", convenios_h2, key="conv_desc_h")
+        col3h, col4h = st.columns(2)
+        with col3h:
+            st.download_button(f"⬇️ {conv_sel_h} CSV", data=convenio_csv(df, conv_sel_h),
+                file_name=nombre_convenio_archivo(conv_sel_h, label_h, "csv"),
+                mime="text/csv", use_container_width=True)
+        with col4h:
+            st.download_button(f"⬇️ {conv_sel_h} Excel", data=convenio_excel(df, conv_sel_h),
+                file_name=nombre_convenio_archivo(conv_sel_h, label_h, "xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Nivel 2: Por convenio ─────────────────────────────────
-    st.markdown("""<div class="nivel-header">
-        <div class="nivel-titulo">🏥 Nivel 2 — Por convenio</div>
-        <div class="nivel-desc">Reporte individual de cada convenio</div>
-    </div>""", unsafe_allow_html=True)
-
-    convenios = convenios_disponibles(df)
-    conv_sel  = st.selectbox("Selecciona el convenio", convenios, key="conv_desc")
-
-    col3, col4 = st.columns(2)
-    with col3:
-        st.download_button(
-            f"⬇️ {conv_sel} CSV",
-            data=convenio_csv(df, conv_sel),
-            file_name=nombre_convenio_archivo(conv_sel, mes_label, "csv"),
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with col4:
-        st.download_button(
-            f"⬇️ {conv_sel} Excel",
-            data=convenio_excel(df, conv_sel),
-            file_name=nombre_convenio_archivo(conv_sel, mes_label, "xlsx"),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Nivel 3: Por tipo de base ─────────────────────────────
-    st.markdown("""<div class="nivel-header">
-        <div class="nivel-titulo">🗂️ Nivel 3 — Por tipo de base</div>
-        <div class="nivel-desc">Reporte individual de cada tipo de base</div>
-    </div>""", unsafe_allow_html=True)
-
-    tipos_disponibles_rep = sorted(df["tipo_base"].unique().tolist())
-    tipo_sel = st.selectbox("Selecciona el tipo de base", tipos_disponibles_rep, key="tipo_desc")
-
-    col5, col6 = st.columns(2)
-    with col5:
-        st.download_button(
-            f"⬇️ {tipo_sel} CSV",
-            data=tipo_base_csv(df, tipo_sel),
-            file_name=nombre_tipo_base_archivo(tipo_sel, mes_label, "csv"),
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with col6:
-        st.download_button(
-            f"⬇️ {tipo_sel} Excel",
-            data=tipo_base_excel(df, tipo_sel),
-            file_name=nombre_tipo_base_archivo(tipo_sel, mes_label, "xlsx"),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
+        st.markdown('''<div class="nivel-header">
+            <div class="nivel-titulo">🗂️ Nivel 3 — Por tipo de base</div>
+            <div class="nivel-desc">Reporte individual de cada tipo de base</div>
+        </div>''', unsafe_allow_html=True)
+        tipos_h    = sorted(df["tipo_base"].unique().tolist())
+        tipo_sel_h = st.selectbox("Selecciona el tipo de base", tipos_h, key="tipo_desc_h")
+        col5h, col6h = st.columns(2)
+        with col5h:
+            st.download_button(f"⬇️ {tipo_sel_h} CSV", data=tipo_base_csv(df, tipo_sel_h),
+                file_name=nombre_tipo_base_archivo(tipo_sel_h, label_h, "csv"),
+                mime="text/csv", use_container_width=True)
+        with col6h:
+            st.download_button(f"⬇️ {tipo_sel_h} Excel", data=tipo_base_excel(df, tipo_sel_h),
+                file_name=nombre_tipo_base_archivo(tipo_sel_h, label_h, "xlsx"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True)
