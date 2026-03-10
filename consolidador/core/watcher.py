@@ -2,6 +2,7 @@
 watcher.py
 Responsabilidad: escanear la estructura de carpetas AÑO/CONVENIO/TIPO_BASE/archivo
 y detectar archivos nuevos vs ya procesados.
+No sabe nada de interfaz ni de procesamiento de datos.
 """
 
 import json
@@ -60,11 +61,17 @@ def _guardar_procesados(procesados: dict):
     )
 
 
+def _normalizar_ruta(ruta: str) -> str:
+    """Normaliza la ruta para comparación consistente entre OS.
+    Resuelve backslash vs slash, mayúsculas y rutas relativas."""
+    return str(Path(ruta).resolve())
+
+
 def marcar_procesado(ruta: str, tipo_base: str):
     """Marca un archivo como procesado con timestamp."""
     from datetime import datetime
     procesados = _cargar_procesados()
-    procesados[ruta] = {
+    procesados[_normalizar_ruta(ruta)] = {
         "tipo_base":    tipo_base,
         "procesado_el": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -74,7 +81,7 @@ def marcar_procesado(ruta: str, tipo_base: str):
 def desmarcar_procesado(ruta: str):
     """Permite reprocesar un archivo quitándolo del registro."""
     procesados = _cargar_procesados()
-    procesados.pop(ruta, None)
+    procesados.pop(_normalizar_ruta(ruta), None)
     _guardar_procesados(procesados)
 
 
@@ -85,7 +92,7 @@ def desmarcar_procesado(ruta: str):
 def _detectar_mes(nombre_archivo: str) -> str:
     """
     Busca el nombre de un mes en el nombre del archivo.
-    BASE_"NOMBREBASE"_"TIPOEPS"_DICIEMBRE_2025.xlsx → "12"
+    BASE_CABEZOTE_CAPITALSALUD_DICIEMBRE_2025.xlsx → "12"
     Retorna "" si no encuentra ninguno.
     """
     nombre_upper = nombre_archivo.upper()
@@ -152,7 +159,7 @@ def escanear(
                     if mes_archivo != mes_filtro:
                         continue
 
-                    ruta_str     = str(archivo)
+                    ruta_str     = _normalizar_ruta(str(archivo))
                     tipo_carpeta = carpeta_tipo.name
                     tipo_base    = mapeo_carpeta_tipo.get(tipo_carpeta, "")
                     ya_procesado = ruta_str in procesados
