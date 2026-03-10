@@ -677,13 +677,24 @@ with tab_cargar:
 # ════════════════════════════════════════════════════════════
 with tab_reporte:
 
-    df = st.session_state.df_resultado
+    df_total = st.session_state.df_resultado
 
-    if df is None or df.empty:
+    if df_total is None or df_total.empty:
         st.info("Procesa los archivos primero en la pestaña **📁 Cargar archivos**.")
         st.stop()
 
     mes_label = st.session_state.mes_label
+
+    # ── Filtro por convenio ───────────────────────────────────
+    opciones_conv = ["Todos"] + sorted(df_total["nombre_convenio"].unique().tolist())
+    conv_reporte  = st.selectbox(
+        "📌 Convenio", opciones_conv, key="filtro_conv_reporte"
+    )
+    df = df_total if conv_reporte == "Todos" else df_total[df_total["nombre_convenio"] == conv_reporte]
+
+    if df.empty:
+        st.warning("No hay registros para el convenio seleccionado.")
+        st.stop()
 
     # ── KPIs ─────────────────────────────────────────────────
     kpis      = kpis_globales(df)
