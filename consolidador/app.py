@@ -428,56 +428,83 @@ with tab_archivos:
             st.divider()
 
             puede_procesar_w = len(seleccionados) > 0
-            if st.button("▶️ Procesar seleccionados", type="primary",
-                         disabled=not puede_procesar_w, use_container_width=True):
+            col_v_w, col_p_w = st.columns(2)
 
-                dfs_w        = []
-                advertencias_w = []
-                errores_w    = []
-                progress_w   = st.progress(0)
+            # ── Paso 1: Verificar ────────────────────────────
+            with col_v_w:
+                if st.button("🔍 Verificar", disabled=not puede_procesar_w,
+                             use_container_width=True, key="verificar_w"):
+                    dfs_prev_w    = []
+                    advertencias_w = []
+                    errores_w     = []
+                    progress_w    = st.progress(0)
 
-                for i, (arch, tipo_base_w) in enumerate(seleccionados):
-                    config_base_w = st.session_state.config.get(tipo_base_w, {})
-                    try:
-                        df_raw_w = pd.read_excel(arch.ruta)
-                        df_proc_w, warns_w = procesar_base(
-                            df_raw_w, config_base_w,
-                            arch.nombre, tipo_base_w,
-                            arch.mes, arch.año,
-                        )
-                        dfs_w.append(df_proc_w)
-                        advertencias_w.extend(warns_w)
+                    for i, (arch, tipo_base_w) in enumerate(seleccionados):
+                        config_base_w = st.session_state.config.get(tipo_base_w, {})
+                        try:
+                            df_raw_w = pd.read_excel(arch.ruta)
+                            df_proc_w, warns_w = procesar_base(
+                                df_raw_w, config_base_w,
+                                arch.nombre, tipo_base_w,
+                                arch.mes, arch.año,
+                            )
+                            dfs_prev_w.append(df_proc_w)
+                            advertencias_w.extend(warns_w)
+                        except Exception as e:
+                            errores_w.append(f"**{arch.nombre}**: {e}")
+                        progress_w.progress((i + 1) / len(seleccionados))
+
+                    progress_w.empty()
+                    st.session_state["preview_w"]       = dfs_prev_w
+                    st.session_state["advertencias_w"]  = advertencias_w
+                    st.session_state["errores_w"]       = errores_w
+                    st.session_state["seleccionados_w"] = seleccionados
+
+            # ── Paso 2: Procesar y guardar ───────────────────
+            with col_p_w:
+                hay_preview_w = bool(st.session_state.get("preview_w"))
+                if st.button("▶️ Procesar y guardar", type="primary",
+                             disabled=not hay_preview_w,
+                             use_container_width=True, key="procesar_w"):
+                    dfs_w  = st.session_state.pop("preview_w")
+                    sels_w = st.session_state.pop("seleccionados_w")
+
+                    for arch, tipo_base_w in sels_w:
                         marcar_procesado(arch.ruta, tipo_base_w)
-                    except Exception as e:
-                        errores_w.append(f"**{arch.nombre}**: {e}")
-                    progress_w.progress((i + 1) / len(seleccionados))
 
-                progress_w.empty()
-
-                if advertencias_w:
-                    with st.expander(f"⚠️ {len(advertencias_w)} advertencia(s)"):
-                        for w in advertencias_w:
-                            st.markdown(f"- {w}")
-                if errores_w:
-                    with st.expander(f"❌ {len(errores_w)} error(es)"):
-                        for e in errores_w:
-                            st.markdown(f"- {e}")
-
-                if dfs_w:
-                    st.session_state.df_resultado = pd.concat(dfs_w, ignore_index=True)
-                    st.session_state.mes_label    = f"{MESES[mes_w]}_{seleccionados[0][0].año}"
+                    df_nuevos_w = pd.concat(dfs_w, ignore_index=True)
+                    mes_nuevo_w = f"{MESES[mes_w]}_{sels_w[0][0].año}"
+                    if (st.session_state.df_resultado is not None and
+                            st.session_state.mes_label == mes_nuevo_w):
+                        st.session_state.df_resultado = pd.concat(
+                            [st.session_state.df_resultado, df_nuevos_w], ignore_index=True
+                        )
+                    else:
+                        st.session_state.df_resultado = df_nuevos_w
+                    st.session_state.mes_label = mes_nuevo_w
                     total_w = len(st.session_state.df_resultado)
                     try:
-                        ruta_p = guardar_parquet(st.session_state.df_resultado, st.session_state.mes_label)
-                        st.success(f"✅ {total_w:,} registros procesados y guardados. Ve a **📊 Reporte**.")
+                        ruta_p = guardar_parquet(st.session_state.df_resultado, mes_nuevo_w)
+                        st.success(f"✅ {total_w:,} registros guardados. Ve a **📊 Reporte**.")
                     except Exception:
                         st.success(f"✅ {total_w:,} registros procesados. Ve a **📊 Reporte**.")
-                    # Refrescar escaneo
                     st.session_state["archivos_escaneados"] = escanear(
                         carpeta_raiz, mes_w,
                         st.session_state.config.get("carpeta_tipo_base", {}),
                     )
                     st.rerun()
+
+            # ── Resultado de verificación ────────────────────
+            if st.session_state.get("advertencias_w"):
+                with st.expander(f"⚠️ {len(st.session_state['advertencias_w'])} advertencia(s)"):
+                    for w in st.session_state["advertencias_w"]:
+                        st.markdown(f"- {w}")
+            elif st.session_state.get("preview_w") is not None:
+                st.success("✅ Sin advertencias. Puedes procesar y guardar.")
+            if st.session_state.get("errores_w"):
+                with st.expander(f"❌ {len(st.session_state['errores_w'])} error(es)"):
+                    for e in st.session_state["errores_w"]:
+                        st.markdown(f"- {e}")
 
         # ── Archivos ya procesados ───────────────────────────
         if procesados:
@@ -571,47 +598,50 @@ with tab_cargar:
 
     puede_procesar = bool(archivos) and len(tipos_asignados) > 0
 
-    if st.button("▶️ Procesar archivos", type="primary",
-                 disabled=not puede_procesar, use_container_width=True):
+    col_v_m, col_p_m = st.columns(2)
 
-        dfs = []
-        advertencias = []
-        errores = []
-        archivos_ok = [a for a in archivos if a.name in tipos_asignados]
-        progress = st.progress(0)
+    # ── Paso 1: Verificar ────────────────────────────────────
+    with col_v_m:
+        if st.button("🔍 Verificar", disabled=not puede_procesar,
+                     use_container_width=True, key="verificar_m"):
+            dfs_prev   = []
+            adverts    = []
+            errores    = []
+            archivos_ok = [a for a in archivos if a.name in tipos_asignados]
+            progress   = st.progress(0)
 
-        for i, archivo in enumerate(archivos_ok):
-            tipo_base   = tipos_asignados[archivo.name]
-            config_base = st.session_state.config[tipo_base]
-            try:
-                archivo.seek(0)
-                df_raw = pd.read_excel(archivo)
-                df_proc, warns = procesar_base(
-                    df_raw, config_base,
-                    archivo.name, tipo_base,
-                    mes_sel, int(año_sel),
-                )
-                dfs.append(df_proc)
-                advertencias.extend(warns)
-            except Exception as e:
-                errores.append(f"**{archivo.name}**: {e}")
-            progress.progress((i + 1) / len(archivos_ok))
+            for i, archivo in enumerate(archivos_ok):
+                tipo_base   = tipos_asignados[archivo.name]
+                config_base = st.session_state.config[tipo_base]
+                try:
+                    archivo.seek(0)
+                    df_raw = pd.read_excel(archivo)
+                    df_proc, warns = procesar_base(
+                        df_raw, config_base,
+                        archivo.name, tipo_base,
+                        mes_sel, int(año_sel),
+                    )
+                    dfs_prev.append(df_proc)
+                    adverts.extend(warns)
+                except Exception as e:
+                    errores.append(f"**{archivo.name}**: {e}")
+                progress.progress((i + 1) / len(archivos_ok))
 
-        progress.empty()
+            progress.empty()
+            st.session_state["preview_m"]      = dfs_prev
+            st.session_state["advertencias_m"] = adverts
+            st.session_state["errores_m"]      = errores
 
-        if advertencias:
-            with st.expander(f"⚠️ {len(advertencias)} advertencia(s)"):
-                for w in advertencias:
-                    st.markdown(f"- {w}")
-        if errores:
-            with st.expander(f"❌ {len(errores)} error(es)"):
-                for e in errores:
-                    st.markdown(f"- {e}")
+    # ── Paso 2: Procesar y guardar ───────────────────────────
+    with col_p_m:
+        hay_preview_m = bool(st.session_state.get("preview_m"))
+        if st.button("▶️ Procesar y guardar", type="primary",
+                     disabled=not hay_preview_m,
+                     use_container_width=True, key="procesar_m"):
+            dfs      = st.session_state.pop("preview_m")
+            mes_nuevo = f"{MESES[mes_sel]}_{int(año_sel)}"
 
-        if dfs:
-            df_nuevos  = pd.concat(dfs, ignore_index=True)
-            mes_nuevo  = f"{MESES[mes_sel]}_{int(año_sel)}"
-            # Acumular con lo que ya había en sesión si es el mismo mes
+            df_nuevos = pd.concat(dfs, ignore_index=True)
             if (st.session_state.df_resultado is not None and
                     st.session_state.mes_label == mes_nuevo):
                 st.session_state.df_resultado = pd.concat(
@@ -622,18 +652,24 @@ with tab_cargar:
             st.session_state.mes_label = mes_nuevo
             total = len(st.session_state.df_resultado)
 
-            # Guardar automáticamente en Parquet
             try:
-                ruta = guardar_parquet(
-                    st.session_state.df_resultado,
-                    st.session_state.mes_label
-                )
-                st.success(f"✅ {total:,} registros procesados y guardados en `{ruta}`. Ve a **📊 Reporte**.")
+                ruta = guardar_parquet(st.session_state.df_resultado, mes_nuevo)
+                st.success(f"✅ {total:,} registros guardados en `{ruta}`. Ve a **📊 Reporte**.")
             except Exception as e:
                 st.success(f"✅ {total:,} registros procesados. Ve a **📊 Reporte**.")
-                st.warning(f"⚠️ No se pudo guardar en Parquet: {e}. Instala pyarrow con `pip install pyarrow`.")
-        else:
-            st.error("No se pudo procesar ningún archivo.")
+                st.warning(f"⚠️ No se pudo guardar en Parquet: {e}.")
+
+    # ── Resultado de verificación ────────────────────────────
+    if st.session_state.get("advertencias_m"):
+        with st.expander(f"⚠️ {len(st.session_state['advertencias_m'])} advertencia(s)"):
+            for w in st.session_state["advertencias_m"]:
+                st.markdown(f"- {w}")
+    elif st.session_state.get("preview_m") is not None:
+        st.success("✅ Sin advertencias. Puedes procesar y guardar.")
+    if st.session_state.get("errores_m"):
+        with st.expander(f"❌ {len(st.session_state['errores_m'])} error(es)"):
+            for e in st.session_state["errores_m"]:
+                st.markdown(f"- {e}")
 
 
 # ════════════════════════════════════════════════════════════
