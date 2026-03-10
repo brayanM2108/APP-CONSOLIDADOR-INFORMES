@@ -11,6 +11,7 @@ Formatos: CSV (liviano) + Excel (múltiples hojas)
 
 import pandas as pd
 import io
+import json
 from pathlib import Path
 from .analizador import (
     resumen_por_convenio,
@@ -295,3 +296,44 @@ def meses_disponibles_parquet() -> list[str]:
         f.stem.replace("consolidado_", "").replace("_", " ")
         for f in archivos
     ]
+def eliminar_archivo_de_parquet(nombre_archivo: str) -> dict:
+    archivos_parquet = sorted(PARQUET_DIR.glob("consolidado_*.parquet"))
+    total_eliminados = 0
+    meses_afectados  = []
+
+    for ruta in archivos_parquet:
+        try:
+            df = pd.read_parquet(ruta, engine="pyarrow")
+            mask = df["archivo_origen"] == nombre_archivo
+            n_filas = mask.sum()
+            if n_filas == 0:
+                continue
+            df_limpio = df[~mask].reset_index(drop=True)
+            if df_limpio.empty:
+                ruta.unlink()
+            else:
+                for col in df_limpio.columns:
+                    if df_limpio[col].dtype == object:
+                        df_limpio[col] = df_limpio[col].fillna("").astype(str)
+                df_limpio.to_parquet(ruta, index=False, engine="pyarrow")
+            total_eliminados += n_filas
+            meses_afectados.append(ruta.stem.replace("consolidado_", "").replace("_", " "))
+        except Exception as e:
+            return {"eliminados": 0, "meses_afectados": [], "error": str(e)}
+
+    try:
+        from .watcher import PROCESADOS_PATH
+        if PROCESADOS_PATH.exists():
+            procesados = json.loads(PROCESADOS_PATH.read_text(encoding="utf-8"))
+            procesados_limpios = {
+                ruta: datos for ruta, datos in procesados.items()
+                if Path(ruta).name != nombre_archivo
+            }
+            PROCESADOS_PATH.write_text(
+                json.dumps(procesados_limpios, ensure_ascii=False, indent=2),
+                encoding="utf-8"
+            )
+    except Exception:
+        pass  # No bloquear si falla la limpieza del json
+
+    return {"eliminados": total_eliminados, "meses_afectados": meses_afectados, "error": None}
