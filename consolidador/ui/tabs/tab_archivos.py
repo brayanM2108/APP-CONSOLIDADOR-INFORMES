@@ -250,15 +250,15 @@ def _bases_consolidadas():
                         st.session_state.pop(f"confirm_del_{a}", None)
                         if st.session_state.df_resultado is not None:
                             df_actual = st.session_state.df_resultado
-                            st.session_state.df_resultado = df_actual[
+                            df_filtrado = df_actual[
                                 df_actual["archivo_origen"] != a
-                            ].reset_index(drop=True) or None
+                                ].reset_index(drop=True)
+                            st.session_state.df_resultado = None if df_filtrado.empty else df_filtrado
                         meses_txt = ", ".join(resultado["meses_afectados"]) or "ninguno"
                         st.success(
                             f"✅ {resultado['eliminados']:,} registros eliminados · "
                             f"Meses afectados: {meses_txt}"
                         )
-                        st.rerun()
             with col_no:
                 if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
                     st.session_state.pop(f"confirm_del_{a}", None)
