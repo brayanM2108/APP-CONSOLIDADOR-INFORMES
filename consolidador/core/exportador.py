@@ -18,6 +18,35 @@ from .analizador import (
     pendientes_por_facturador,
 )
 
+# ════════════════════════════════════════════════════════════
+# CARGA DE CONFIGURACIÓN PARA COLUMNAS EXTRA POR TIPO DE BASE
+# ════════════════════════════════════════════════════════════
+
+def _cargar_config() -> dict:
+    """Carga el config.json para obtener columnas extra por tipo de base."""
+    config_path = Path(__file__).parent.parent / "config" / "config.json"
+    if config_path.exists():
+        return json.loads(config_path.read_text(encoding="utf-8"))
+    return {}
+
+
+def _aliases_extra_de_tipo_base(tipo_base: str) -> list[str]:
+    """
+    Retorna la lista de aliases (nombres finales) de las columnas extra
+    configuradas para un tipo de base específico.
+    Solo devuelve los aliases del tipo_base indicado, no de otros.
+    """
+    config = _cargar_config()
+    conf_tipo = config.get(tipo_base, {})
+    columnas_extra = conf_tipo.get("columnas_extra", [])
+    aliases = []
+    for item in columnas_extra:
+        if isinstance(item, dict):
+            aliases.append(item.get("alias", item.get("col", "")))
+        elif isinstance(item, str):
+            aliases.append(item)
+    return [a for a in aliases if a]
+
 
 # ════════════════════════════════════════════════════════════
 # HELPERS INTERNOS
@@ -74,6 +103,21 @@ def _limpiar_columnas_vacias(df) -> "pd.DataFrame":
     return df[cols_no_vacias]
 
 
+def _columnas_propias_tipo_base(df: "pd.DataFrame", tipo_base: str) -> list[str]:
+    """
+    Retorna la lista de columnas que pertenecen al tipo_base indicado:
+    las columnas estándar (COLUMNAS) + solo las columnas extra configuradas
+    para ESE tipo_base en el config.json.
+
+    Esto evita que columnas extra de otros tipos de base aparezcan en el reporte.
+    """
+    from .procesador import COLUMNAS as COLS_STD
+    aliases_extra = _aliases_extra_de_tipo_base(tipo_base)
+    columnas_objetivo = COLS_STD + aliases_extra
+    # Solo incluir las que existen en el DataFrame
+    return [c for c in columnas_objetivo if c in df.columns]
+
+
 # ════════════════════════════════════════════════════════════
 # NIVEL 2 — POR CONVENIO
 # ════════════════════════════════════════════════════════════
@@ -119,9 +163,11 @@ def convenio_excel(df: pd.DataFrame, convenio: str) -> bytes:
         "Detalle Pendientes":        df_detalle,
     }
 
-    # Una hoja por tipo de base con sus columnas limpias
+    # Una hoja por tipo de base con sus columnas propias
     for tipo_base in sorted(df_c["tipo_base"].unique()):
-        df_tipo = _limpiar_columnas_vacias(df_c[df_c["tipo_base"] == tipo_base].copy())
+        df_tipo = df_c[df_c["tipo_base"] == tipo_base].copy()
+        cols = _columnas_propias_tipo_base(df_tipo, tipo_base)
+        df_tipo = df_tipo[cols]
         nombre_hoja = tipo_base.split(" - ", 1)[-1] if " - " in tipo_base else tipo_base
         hojas[nombre_hoja] = df_tipo
 
@@ -133,17 +179,20 @@ def convenio_excel(df: pd.DataFrame, convenio: str) -> bytes:
 # ════════════════════════════════════════════════════════════
 
 def tipo_base_csv(df: pd.DataFrame, tipo_base: str) -> bytes:
-    df_t = _limpiar_columnas_vacias(df[df["tipo_base"] == tipo_base].copy())
-    return _csv(df_t)
+    df_t = df[df["tipo_base"] == tipo_base].copy()
+    cols = _columnas_propias_tipo_base(df_t, tipo_base)
+    return _csv(df_t[cols])
 
 
 def tipo_base_excel(df: pd.DataFrame, tipo_base: str) -> bytes:
     from .procesador import COLUMNAS
 
-    df_t = _limpiar_columnas_vacias(df[df["tipo_base"] == tipo_base].copy())
+    df_t = df[df["tipo_base"] == tipo_base].copy()
+    cols = _columnas_propias_tipo_base(df_t, tipo_base)
+    df_t = df_t[cols]
 
-    # Columnas extra que quedaron después de limpiar
-    cols_extra = [c for c in df_t.columns if c not in COLUMNAS]
+    # Columnas extra que pertenecen a este tipo de base
+    cols_extra = [c for c in cols if c not in COLUMNAS]
 
     # Detalle pendientes con columnas extra incluidas
     cols_detalle = [
