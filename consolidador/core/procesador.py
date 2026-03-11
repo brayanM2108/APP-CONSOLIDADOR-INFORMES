@@ -105,13 +105,16 @@ def procesar_base(
 
     # Construir DataFrame estándar
     df = pd.DataFrame()
-    df["documento_paciente"]   = _limpiar_texto(_mapear_columna(df_raw, config.get("col_paciente")))
+    df["documento_paciente"] = _mapear_columna(df_raw, config.get("col_paciente"))
     df["nombre_paciente"]      = _mapear_columna(df_raw, config.get("col_nombre"))
     df["cups"]                 = _mapear_columna(df_raw, config.get("col_cups"))
     df["descripcion_servicio"] = _mapear_columna(df_raw, config.get("col_servicio"))
     df["fecha_atencion"]       = _mapear_columna(df_raw, config.get("col_fecha"))
     df["facturador"]           = _mapear_columna(df_raw, config.get("col_facturador"))
     df["observacion"]          = _mapear_columna(df_raw, config.get("col_observacion"))
+
+    for col_id in ["documento_paciente", "cups"]:
+        df[col_id] = _limpiar_float_a_entero(df[col_id])
 
     # Estado de facturación
     col_fact = config.get("col_facturacion")
@@ -122,8 +125,9 @@ def procesar_base(
         df["estado"] = df_raw[col_fact].apply(lambda v: _detectar_estado(v, logica)).values
     else:
         df["valor_estado_original"] = ""
-        df["estado"]                = "Sin información"
-        advertencias.append(f"Columna de facturación '{col_fact}' no encontrada. Estado marcado como 'Sin información'.")
+        df["estado"] = "Sin información"
+        advertencias.append(
+            f"Columna de facturación '{col_fact}' no encontrada. Estado marcado como 'Sin información'.")
 
     # Metadatos
     df["tipo_base"]      = tipo_base
@@ -159,6 +163,8 @@ def procesar_base(
 
         if col_real in df_raw.columns:
             df[alias] = df_raw[col_real].reset_index(drop=True)
+            # Limpiar floats que son realmente enteros
+            df[alias] = _limpiar_float_a_entero(df[alias])
             extras_encontradas.append(alias)
         else:
             df[alias] = ""
@@ -204,4 +210,21 @@ def _limpiar_texto(serie: pd.Series) -> pd.Series:
         texto = re.sub(r'[^\x20-\x7E\u00C0-\u024F\u00B0-\u00BF]', '', texto)
         return texto.strip()
 
+    return serie.apply(limpiar)
+
+def _limpiar_float_a_entero(serie: pd.Series) -> pd.Series:
+    """
+    Convierte valores float que representan enteros a string sin decimales.
+    Ej: 1234567.0 → '1234567'
+    """
+    def limpiar(val):
+        if pd.isna(val) or str(val).strip() == "":
+            return ""
+        if isinstance(val, float) and val == int(val):
+            return str(int(val))
+        s = str(val).strip()
+        # Manejar strings que terminan en .0
+        if re.match(r'^\d+\.0$', s):
+            return s[:-2]
+        return s
     return serie.apply(limpiar)
