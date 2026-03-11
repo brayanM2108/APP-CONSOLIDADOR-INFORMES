@@ -69,7 +69,7 @@ def pendientes_por_facturador(df: pd.DataFrame) -> pd.DataFrame:
         .groupby(["nombre_convenio", "facturador"])
         .agg(
             Pendientes      =("estado", "count"),
-            Con_observacion =("observacion", lambda x: (x.str.strip() != "").sum()),
+            Con_observacion=("observacion", lambda x: (x.fillna("").astype(str).str.strip() != "").sum()),
         )
         .reset_index()
         .sort_values("Pendientes", ascending=False)
