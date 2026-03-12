@@ -46,7 +46,7 @@ def resumen_por_convenio(df: pd.DataFrame) -> pd.DataFrame:
             g[col] = 0
 
     g["Total"]            = g[["Facturado", "Pendiente", "Sin información"]].sum(axis=1)
-    g["Cumplimiento (%)"] = (g["Facturado"] / g["Total"] * 100).round(1)
+    g["Cumplimiento (%)"] = (g["Facturado"] / g["Total"] * 100).round(0).astype(int)
 
     return g.rename(columns={"nombre_convenio": "Convenio"})[[
         "Convenio", "Total", "Facturado", "Pendiente", "Sin información", "Cumplimiento (%)"
