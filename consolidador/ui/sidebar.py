@@ -176,16 +176,25 @@ def _historial():
                     st.rerun()
         else:
             convenios_disp = sorted(df_hist_all["nombre_convenio"].unique().tolist())
-            conv_sel_h = st.selectbox("Convenio", convenios_disp, key="hist_conv_sel")
+            conv_sel_h = st.selectbox(
+                "Convenio", ["Todos"] + convenios_disp, key="hist_conv_sel"
+            )
             if st.button("📥 Cargar convenio", use_container_width=True, key="btn_cargar_conv"):
-                df_conv_h = df_hist_all[
-                    df_hist_all["nombre_convenio"] == conv_sel_h
-                ].copy()
+                if conv_sel_h == "Todos":
+                    df_conv_h = df_hist_all.copy()
+                    label = "Todos los convenios"
+                else:
+                    df_conv_h = df_hist_all[
+                        df_hist_all["nombre_convenio"] == conv_sel_h
+                    ].copy()
+                    label = conv_sel_h
+
                 st.session_state.df_resultado = df_conv_h
-                st.session_state.mes_label = conv_sel_h
+                st.session_state.mes_label = label
                 st.session_state.modo_reporte = "convenio"
-                st.success(f"✅ {conv_sel_h} cargado ({len(df_conv_h):,} registros)")
+                st.success(f"✅ {label} cargado ({len(df_conv_h):,} registros)")
                 st.rerun()
+
 
 
 def _inspector():
