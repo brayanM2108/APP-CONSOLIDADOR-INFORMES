@@ -1,0 +1,473 @@
+{
+  "PAD - CUIDADORES NUEVA EPS": {
+    "col_paciente": "Numero De Documento",
+    "col_nombre": "Nombre",
+    "col_servicio": "Servicio",
+    "col_fecha": "Fecha Inicio",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "Horas",
+      "Consumidos",
+      "Numero de Autorizacion",
+      "MIPRES",
+      "ID Programacion",
+      "ID Entrega",
+      "ID Ciclo"
+    ]
+  },
+  "PAD - ENFERMERIA SALUD TOTAL": {
+    "col_paciente": "Documento",
+    "col_nombre": "Nombre Del Paciente",
+    "col_servicio": "Servicio",
+    "col_fecha": "Fecha de Inicio",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "Observacion",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "Consumidos",
+      "Autorizacion",
+      "Mipres",
+      "Horas Serv Asignada",
+      "Frecuencia",
+      "ID programación",
+      "ID Entrega",
+      "ID Ciclo"
+    ]
+  },
+  "PAD - CABEZOTE CAPITAL SALUD ": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRES",
+    "col_servicio": "Servicio",
+    "col_fecha": "FECHA DE INGRESO",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "VALORACION MEDICINA GENERAL",
+      "VALORACION PSICOLOGIA",
+      {
+        "col": "Nº AUTORIZACIÒN",
+        "alias": "Nº AUTORIZACIÒN PSICOLOGIA"
+      },
+      "VALORACION TRABAJO SOCIAL",
+      {
+        "col": "Nº AUTORIZACIÒN.1",
+        "alias": "Nº AUTORIZACIÒN TRABAJO SOCIAL"
+      },
+      "VALORACION NUTRICION",
+      {
+        "col": "Nº AUTORIZACIÒN.3",
+        "alias": "Nº AUTORIZACIÒN NUTRICION"
+      },
+      "ESPECIALIDAD CUIDADO PALIATIVO",
+      {
+        "col": "Nº AUTORIZACIÒN.4",
+        "alias": "Nº AUTORIZACIÒN CUIDADO PALIATIVO"
+      },
+      "VALORACION POR ENFERMERIA JEFE",
+      {
+        "col": "Nº AUTORIZACIÒN.5",
+        "alias": "Nº AUTORIZACIÒN ENFERMERIA JEFE"
+      },
+      "COMPLEJIDAD HERIDA",
+      "CANTIDAD DE CH",
+      "CLINICA HERIDAS CARGUE PLATAFORMA CAPITAL SALUD",
+      {
+        "col": "Nº AUTORIZACIÒN.6",
+        "alias": "Nº AUTORIZACIÒN CLINICA HERIDAS"
+      },
+      "TERAPIAS FISICAS",
+      {
+        "col": "Nº AUTORIZACIÒN.7",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS FISICAS"
+      },
+      "TERAPIAS FONOAUDIOLOGIA",
+      {
+        "col": "Nº AUTORIZACIÒN.8",
+        "alias": "Nº AUTORIZACION FONOAUDIOLOGIA"
+      },
+      "TERAPIAS OCUPACIONALES",
+      {
+        "col": "Nº AUTORIZACIÒN.9",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS OCUPACIONALES"
+      },
+      "TERAPIAS RESPIRATORIAS",
+      {
+        "col": "Nº AUTORIZACIÒN.10",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS RESPIRATORIAS"
+      }
+    ]
+  },
+  "PAD - CABEZOTE SALUD TOTAL ": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRES",
+    "col_servicio": "Servicio",
+    "col_fecha": "FECHA DE INGRESO",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "VALORACION MEDICINA GENERAL",
+      {
+        "col": "Nº AUTORIZACIÒN",
+        "alias": "Nº AUTORIZACIÒN MEDICINA GENERAL"
+      },
+      "VALORACION PSICOLOGIA",
+      {
+        "col": "Nº AUTORIZACIÒN.1",
+        "alias": "Nº AUTORIZACIÒN PSICOLOGIA"
+      },
+      "VALORACION TRABAJO SOCIAL",
+      {
+        "col": "Nº AUTORIZACIÒN.2",
+        "alias": "Nº AUTORIZACIÒN TRABAJO SOCIAL"
+      },
+      "VALORACION NUTRICION",
+      {
+        "col": "Nº AUTORIZACIÒN.3",
+        "alias": "Nº AUTORIZACIÒN NUTRICION"
+      },
+      "ESPECIALIDAD CUIDADO PALIATIVO",
+      {
+        "col": "Nº AUTORIZACIÒN.4",
+        "alias": "Nº AUTORIZACIÒN CUIDADO PALIATIVO"
+      },
+      "VALORACION POR ENFERMERIA JEFE",
+      {
+        "col": "Nº AUTORIZACIÒN.5",
+        "alias": "Nº AUTORIZACIÒN ENFERMERIA JEFE"
+      },
+      "COMPLEJIDAD HERIDA",
+      "CANTIDAD DE CH",
+      "CLINICA HERIDAS CARGUE PLATAFORMA SALUD TOTAL",
+      {
+        "col": "Nº AUTORIZACIÒN.6",
+        "alias": "Nº AUTORIZACIÒN CLINICA HERIDAS"
+      },
+      "TERAPIAS FISICAS",
+      "TERAPIAS FISICAS PLATAFORMA SALUD TOTAL",
+      {
+        "col": "Nº AUTORIZACIÒN.7",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS FISICAS"
+      },
+      "TERAPIAS FONOAUDIOLOGIA",
+      "TERAPIAS FONOAUDILOGIA PLATAFORMA SALUD TOTAL",
+      {
+        "col": "Nº AUTORIZACIÒN.8",
+        "alias": "Nº AUTORIZACION FONOAUDIOLOGIA"
+      },
+      "TERAPIAS OCUPACIONALES",
+      "TERAPIAS OCUPACIONAL PLATAFORMA SALUD TOTAL",
+      {
+        "col": "Nº AUTORIZACIÒN.9",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS OCUPACIONALES"
+      },
+      "TERAPIAS RESPIRATORIAS",
+      "TERAPIAS REPIRATORIAS PLATAFORMA SALUD TOTAL",
+      {
+        "col": "Nº AUTORIZACIÒN.10",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS RESPIRATORIAS"
+      },
+      "TERAPIAS RESPIRATORIAS CON SUCCION",
+      "TERAPIAS REPIRATORIAS CON SUCCION PLATAFORMA SALUD TOTAL",
+      {
+        "col": "Nº AUTORIZACIÒN.11",
+        "alias": "Nº AUTORIZACIÒN TERAPIAS RESPIRATORIAS CON SUCCION"
+      },
+      "TOMA DE LABORATORIOS",
+      {
+        "col": "Nº AUTORIZACIÒN.12",
+        "alias": "Nº AUTORIZACIÒN TOMA DE LABORATORIOS"
+      }
+    ]
+  },
+  "PAD - FACTURACION NUEVA EPS": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRES",
+    "col_servicio": null,
+    "col_fecha": null,
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "VALORACION MEDICINA GENERAL",
+      "VALORACION PSICOLOGIA",
+      "VALORACION TRABAJO SOCIAL",
+      "VALORACION NUTRICION",
+      "ESPECIALIDAD CUIDADO PALIATIVO",
+      "CANTIDAD DE CH",
+      "TERAPIAS FISICAS",
+      "TERAPIAS FONOAUDIOLOGIA",
+      "TERAPIAS OCUPACIONALES",
+      "TERAPIAS RESPIRATORIAS",
+      "TOTAL DE TERAPIAS"
+    ]
+  },
+  "PAD - CRONICOS NUEVA EPS": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE",
+    "col_cups": null,
+    "col_servicio": null,
+    "col_fecha": "FECHA DE INGRESO A PHD",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "VALORACION MEDICINA GENERAL",
+      "FISIOTERAPIA",
+      "FONOAUDIOLOGIA",
+      "TERAPIA OCUPACIONAL",
+      "TERAPIA RESPIRATORIA",
+      "TOTAL DE TERAPIAS",
+      "TERAPIAS ADICIONALES",
+      "REPORTE CLINICA HERIDAS",
+      "REPORTE CUIDADOS PALIATIVO",
+      "REPORTE TRABAJO SOCIAL",
+      "REPORTE NUTRICIÓN",
+      "REPORTE PSICOLOGIA",
+      "PAQUETE1",
+      "# AUTORIZACION PAQUETE1",
+      "VALOR PAQUETE"
+    ]
+  },
+  "PAD - CRONICOS SURA": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE",
+    "col_cups": null,
+    "col_servicio": null,
+    "col_fecha": null,
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACIONES",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "VALORACION MEDICINA GENERAL",
+      "AUTORIZACION",
+      "TERAPIA RESPIRATORIA 890112",
+      {
+        "col": "AUTORIZACION.1",
+        "alias": "Nº AUTORIZACIÒN TERAPIA RESPIRATORIA"
+      },
+      "TERAPIA FISICA 890111",
+      {
+        "col": "AUTORIZACION.2",
+        "alias": "Nº AUTORIZACIÒN TERAPIA FISICA"
+      },
+      "TERAPIA OCUPACIONAL 890113",
+      {
+        "col": "AUTORIZACION.3",
+        "alias": "Nº AUTORIZACIÒN TERAPIA OCUPACIONAL"
+      },
+      "VALORACION NUTRICION 40150",
+      {
+        "col": "AUTORIZACION.4",
+        "alias": "Nº AUTORIZACIÒN NUTRICION"
+      },
+      "VALORACION TRABAJO SOCIAL",
+      {
+        "col": "AUTORIZACION.5",
+        "alias": "Nº AUTORIZACIÒN TRABAJO SOCIAL"
+      },
+      "VALORACION PSICOLOGIA",
+      {
+        "col": "AUTORIZACION.6",
+        "alias": "Nº AUTORIZACIÒN PSICOLOGIA"
+      },
+      "CURACIONES 40202",
+      {
+        "col": "AUTORIZACION.7",
+        "alias": "Nº AUTORIZACIÒN CURACIONES"
+      },
+      "ENFERMERIA 401134",
+      {
+        "col": "AUTORIZACION.8",
+        "alias": "Nº AUTORIZACIÒN ENFERMERIA"
+      },
+      "VALORACION CUIDADOS PALEATIVOS",
+      {
+        "col": "AUTORIZACION.9",
+        "alias": "Nº AUTORIZACIÒN CUIDADOS PALEATIVOS"
+      }
+    ]
+  },
+  "CEX - FACTURACION": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA  ATENCION",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION.1",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "EPS",
+      "CONVENIO",
+      "CODIGO PROCEDIMIENTO",
+      "NRO LEGALIZACION",
+      "NRO CITA",
+      "NUMERO AUTORIZACION",
+      "MES DE ATENCION"
+    ]
+  },
+  "CEX - CAPITAL SALUD": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA FACTURA",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "CONVENIO",
+      "CODIGO PROCEDIMIENTO",
+      "ESTADO HC",
+      "N° AUTORIZACION"
+    ]
+  },
+  "CEX - NUEVA EPS": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA FACTURA",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "CONVENIO",
+      "CODIGO PROCEDIMIENTO",
+      "ESTADO HC",
+      "N° AUTORIZACION"
+    ]
+  },
+  "CEX - SALUD TOTAL": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA FACTURA",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "CONVENIO",
+      "CODIGO PROCEDIMIENTO"
+    ]
+  },
+  "PIR - FACTURACION SURA": {
+    "col_paciente": "IDENTIFICACION",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA  ATENCIÓN",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "CODIGO PROCEDIMIENTO",
+      "NOMBRE PROCEDIMIENTO",
+      "NRO LEGALIZACION",
+      "ESPECIALIDAD",
+      "ESTADO HC",
+      "NUMERO AUTORIZACION.1"
+    ]
+  },
+  "PIR - CAPITAL SALUD": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA  ATENCIÓN",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "CONVENIO",
+      "CODIGO PROCEDIMIENTO",
+      "NRO LEGALIZACION",
+      "ESPECIALIDAD",
+      "ESTADO HC",
+      "NUMERO AUTORIZACION",
+      "NUMERO AUTORIZACION.1"
+    ]
+  },
+  "PIR - SALUD TOTAL": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA  ATENCIÓN",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "CONVENIO",
+      "CODIGO PROCEDIMIENTO",
+      "NRO LEGALIZACION",
+      "ESPECIALIDAD",
+      "ESTADO HC",
+      "NUMERO AUTORIZACION",
+      "NUMERO AUTORIZACION.1"
+    ]
+  },
+  "PIR - NUEVA EPS": {
+    "col_paciente": "DOCUMENTO",
+    "col_nombre": "NOMBRE PACIENTE",
+    "col_cups": null,
+    "col_servicio": null,
+    "col_fecha": null,
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "AUTORIZACION"
+    ]
+  },
+  "PIR - SERVICIOS NO PBS": {
+    "col_paciente": "Nº DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO",
+    "col_cups": null,
+    "col_servicio": "SERVICIO",
+    "col_fecha": null,
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": []
+  },
+
+  "IDIPRON - FACTURACION": {
+    "col_paciente": "NÚMERO DE DOCUMENTO",
+    "col_nombre": "NOMBRE COMPLETO DEL USUARIO",
+    "col_cups": "CUPS",
+    "col_servicio": "NOMBRE PROCEDIMIENTO",
+    "col_fecha": "FECHA DE INGRESO",
+    "col_facturador": "ASIGNACION",
+    "col_observacion": "OBSERVACION",
+    "col_facturacion": "FACTURA",
+    "logica_facturacion": "tiene_valor",
+    "columnas_extra": [
+      "AMBITO HOSPITALARIO",
+      "NUMERO DE AUTORIZACION",
+      "LLAVE",
+      "LEGALIZACION"
+    ]
+  },
+  "carpeta_base": {}
+}
