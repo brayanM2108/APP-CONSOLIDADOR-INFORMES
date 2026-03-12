@@ -99,6 +99,17 @@ def _reporte_convenio(df_total, mes_label):
     meses_ord = sorted(df_total["_orden"].unique().tolist())
     meses_labs = [_label_mes(m) for m in meses_ord]
 
+    # ── Filtro de convenio (visible cuando se carga "Todos") ──────────
+    convenios_disp = sorted(df_total["nombre_convenio"].unique().tolist())
+    if len(convenios_disp) > 1:
+        conv_sel = st.selectbox(
+            "📌 Convenio", ["Todos"] + convenios_disp, key="filtro_conv_convenio"
+        )
+        if conv_sel != "Todos":
+            df_total = df_total[df_total["nombre_convenio"] == conv_sel].copy()
+            meses_ord = sorted(df_total["_orden"].unique().tolist())
+            meses_labs = [_label_mes(m) for m in meses_ord]
+
     st.caption(f"Convenio: **{mes_label}** · {len(meses_labs)} mes(es) disponibles")
 
     col_d1, col_d2 = st.columns(2)
@@ -147,13 +158,26 @@ def _reporte_convenio(df_total, mes_label):
     ].sum(axis=1)
     resumen_mes["Cumplimiento (%)"] = (
         resumen_mes["Facturado"] / resumen_mes["Total"] * 100
-    ).round(1)
+    ).round(0).astype(int)
     st.dataframe(
         resumen_mes.style.background_gradient(
             subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
         ),
         use_container_width=True, hide_index=True,
     )
+
+    # ── Resumen por convenio (solo si se cargaron todos) ─────────────
+    if len(convenios_disp) > 1:
+        st.divider()
+        st.subheader("🏥 Resumen por convenio")
+        rc = resumen_por_convenio(df)
+        if not rc.empty:
+            st.dataframe(
+                rc.style.background_gradient(
+                    subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
+                ),
+                use_container_width=True, hide_index=True,
+            )
 
     st.divider()
 
