@@ -222,13 +222,48 @@ def _bases_consolidadas():
         st.caption("Aún no hay bases guardadas en el historial.")
         return
 
-    convenios_total = sorted(df_total["nombre_convenio"].unique().tolist())
-    conv_filtro = st.selectbox("Convenio", convenios_total, key="bases_conv_filtro")
+    # ── Filtro de mes ──────────────────────────────────────
+    meses_disponibles = sorted(df_total["archivo_origen"].apply(
+        lambda x: x  # placeholder
+    ))
+    # Obtener meses únicos desde el DataFrame
+    if "mes" in df_total.columns and "año" in df_total.columns:
+        df_total["_mes_label"] = df_total["año"].astype(str) + " - " + df_total["mes"].astype(str).str.zfill(2)
+        meses_unicos = ["Todos"] + sorted(df_total["_mes_label"].unique().tolist())
+    else:
+        meses_unicos = ["Todos"]
 
-    df_conv = df_total[df_total["nombre_convenio"] == conv_filtro]
+    col_mes, col_conv = st.columns(2)
+
+    with col_mes:
+        mes_filtro = st.selectbox("Mes", meses_unicos, key="bases_mes_filtro")
+
+    # Filtrar por mes antes de poblar el selector de convenio
+    if mes_filtro != "Todos":
+        df_filtrado_mes = df_total[df_total["_mes_label"] == mes_filtro]
+    else:
+        df_filtrado_mes = df_total
+
+    convenios_total = ["Todos"] + sorted(df_filtrado_mes["nombre_convenio"].unique().tolist())
+
+    with col_conv:
+        conv_filtro = st.selectbox("Convenio", convenios_total, key="bases_conv_filtro")
+
+    # Aplicar filtro de convenio
+    if conv_filtro != "Todos":
+        df_conv = df_filtrado_mes[df_filtrado_mes["nombre_convenio"] == conv_filtro]
+    else:
+        df_conv = df_filtrado_mes
+
+    # Limpiar columna auxiliar
+    df_total.drop(columns=["_mes_label"], inplace=True, errors="ignore")
+    df_conv = df_conv.drop(columns=["_mes_label"], errors="ignore")
+
     archivos_conv = sorted(df_conv["archivo_origen"].unique().tolist())
 
-    st.caption(f"{len(archivos_conv)} archivo(s) consolidado(s) para **{conv_filtro}**:")
+    label_filtro = f"**{conv_filtro}**" if conv_filtro != "Todos" else "todos los convenios"
+    label_mes = f" en **{mes_filtro}**" if mes_filtro != "Todos" else ""
+    st.caption(f"{len(archivos_conv)} archivo(s) consolidado(s) para {label_filtro}{label_mes}:")
 
     for a in archivos_conv:
         col_a, col_btn = st.columns([5, 1])
@@ -252,14 +287,14 @@ def _bases_consolidadas():
                             df_actual = st.session_state.df_resultado
                             df_filtrado = df_actual[
                                 df_actual["archivo_origen"] != a
-                                ].reset_index(drop=True)
+                            ].reset_index(drop=True)
                             st.session_state.df_resultado = None if df_filtrado.empty else df_filtrado
                         meses_txt = ", ".join(resultado["meses_afectados"]) or "ninguno"
                         st.success(
                             f"✅ {resultado['eliminados']:,} registros eliminados · "
                             f"Meses afectados: {meses_txt}"
                         )
-            with col_no:
-                if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
-                    st.session_state.pop(f"confirm_del_{a}", None)
-                    st.rerun()
+                with col_no:
+                    if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
+                        st.session_state.pop(f"confirm_del_{a}", None)
+                        st.rerun()
