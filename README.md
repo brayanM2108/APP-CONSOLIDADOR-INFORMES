@@ -11,10 +11,10 @@ Aplicacion web desarrollada con Streamlit para consolidar informes operativos de
 
 Centralizar el control de facturacion en una sola aplicacion para:
 
-- consolidar archivos heterogeneos en un esquema comun,
-- detectar pendientes de facturacion,
-- cruzar contra archivo de facturado,
-- y entregar indicadores de gestion listos para analisis y descarga.
+- Consolidar archivos heterogeneos en un esquema común
+- Detectar pendientes de facturacion
+- Cruzar contra archivo de facturado
+- Entregar indicadores de gestion listos para analisis y descarga
 
 ## Caracteristicas
 
@@ -89,10 +89,7 @@ Incluye toda la base consolidada del periodo/rango seleccionado.
 - Pendientes por facturador
 - Detalle de pendientes
 - Consolidado general
-
-Archivos generados:
-- `general_<mes_label>.csv`
-- `general_<mes_label>.xlsx`
+`
 
 ### Nivel 2: Por convenio
 Genera un reporte independiente para cada convenio.
@@ -102,9 +99,6 @@ Genera un reporte independiente para cada convenio.
 - Detalle de pendientes
 - Hojas por tipo de base del convenio (en Excel)
 
-Archivos generados:
-- `<convenio>_<mes_label>.csv`
-- `<convenio>_<mes_label>.xlsx`
 
 ### Nivel 3: Por tipo de base
 Genera un reporte independiente por cada tipo de base.
@@ -188,10 +182,5 @@ streamlit run consolidador/app.py
 - Historial consolidado: `consolidador/datos/parquet/consolidado_*.parquet`
 - Facturado guardado: `consolidador/datos/parquet/facturado.parquet`
 - Cruces guardados: `consolidador/datos/parquet/cruce_*.parquet`
-
-## Notas
-
-- Proyecto orientado a uso interno operativo.
-- Este README no incluye informacion sensible ni configuraciones privadas.
 
 
