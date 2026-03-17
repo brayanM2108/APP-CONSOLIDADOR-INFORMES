@@ -1,5 +1,5 @@
 """Tab 'Facturado' — carga y almacenamiento del archivo de facturado."""
-
+import pandas as pd
 import streamlit as st
 from core.facturado import (
     leer_facturado,
@@ -132,42 +132,112 @@ def render_tab_facturado():
         st.info("📭 No hay bases procesadas. Procesa archivos primero.")
         return
 
-    mes_cruce = st.selectbox(
-        "Selecciona el mes a cruzar", meses, key="mes_cruce_sel"
-    )
 
-    st.caption(
-        "El cruce agrega la columna **estado_cruce** a las bases del mes seleccionado. "
-        "No modifica el estado original."
-    )
+    modo_cruce = st.session_state.get("modo_cruce", None)
 
-    if st.button(
-            "🔀 Ejecutar cruce",
-            type="primary",
-            use_container_width=True,
-            key="btn_ejecutar_cruce",
-    ):
-        with st.spinner("Cargando datos y ejecutando cruce..."):
-            try:
-                df_bases = cargar_parquet(mes_cruce.replace(" ", "_"))
-                if df_bases is None or df_bases.empty:
-                    st.error("❌ No se encontraron bases para el mes seleccionado.")
-                    return
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        if st.button("📅 Cruce por mes", use_container_width=True, key="btn_modo_mes"):
+            st.session_state["modo_cruce"] = "mes"
+            st.session_state.pop("df_cruce_resultado", None)
+            st.rerun()
+    with col_m2:
+        if st.button("🗂️ Cruce por base", use_container_width=True, key="btn_modo_base"):
+            st.session_state["modo_cruce"] = "base"
+            st.session_state.pop("df_cruce_resultado", None)
+            st.rerun()
 
-                df_fact = cargar_facturado()
-                if df_fact is None:
-                    st.error("❌ No se pudo cargar el facturado guardado.")
-                    return
+    if modo_cruce is None:
+        st.caption("Selecciona un modo de cruce.")
+        return
 
-                df_cruzado = cruzar_bases_con_facturado(
-                    df_bases, df_fact, st.session_state.config
-                )
-                st.session_state["df_cruce_resultado"] = df_cruzado
-                st.session_state["mes_cruce_label"] = mes_cruce
-                st.success(f"✅ Cruce completado — {len(df_cruzado):,} registros procesados.")
+    st.divider()
 
-            except Exception as e:
-                st.error(f"❌ Error en el cruce: {e}")
+    # ── Modo 1: Por mes ───────────────────────────────────────
+    if modo_cruce == "mes":
+        st.markdown("#### 📅 Cruce por mes")
+        st.caption("Cruza todas las bases del mes seleccionado.")
+
+        mes_cruce = st.selectbox("Mes", meses, key="mes_cruce_sel")
+        df_bases_prev = cargar_parquet(mes_cruce.replace(" ", "_"))
+        if df_bases_prev is not None:
+            st.caption(f"📋 **{len(df_bases_prev):,}** registros a cruzar")
+
+        if st.button("🔀 Ejecutar cruce por mes", type="primary",
+                     use_container_width=True, key="btn_cruce_mes"):
+            with st.spinner("Ejecutando cruce..."):
+                try:
+                    df_bases = cargar_parquet(mes_cruce.replace(" ", "_"))
+                    if df_bases is None or df_bases.empty:
+                        st.error("❌ No se encontraron bases para el mes seleccionado.")
+                        return
+                    df_fact = cargar_facturado()
+                    if df_fact is None:
+                        st.error("❌ No se pudo cargar el facturado guardado.")
+                        return
+                    df_cruzado = cruzar_bases_con_facturado(
+                        df_bases, df_fact, st.session_state.config
+                    )
+                    st.session_state["df_cruce_resultado"] = df_cruzado
+                    st.session_state["mes_cruce_label"] = mes_cruce
+                    st.success(f"✅ Cruce completado — {len(df_cruzado):,} registros.")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+
+        # ── Modo 2: Por base ──────────────────────────────────────
+    else:
+        st.markdown("#### 🗂️ Cruce por convenio y tipo de base")
+        st.caption("Usa todos los meses de la base cargada en sesión.")
+
+        df_bases_prev = st.session_state.get("df_resultado")
+
+        if df_bases_prev is None or df_bases_prev.empty:
+            st.warning("⚠️ No hay datos cargados en sesión. Carga un mes o convenio desde el historial primero.")
+            return
+
+        meses_en_sesion = sorted(df_bases_prev["mes"].unique().tolist()) if "mes" in df_bases_prev.columns else []
+        st.caption(f"📅 Meses en sesión: **{', '.join(str(m) for m in meses_en_sesion)}**")
+
+        conv_cruce = tipo_cruce = None
+
+        convenios_disp = ["Todos"] + sorted(df_bases_prev["nombre_convenio"].unique().tolist())
+        conv_cruce = st.selectbox("Convenio", convenios_disp, key="conv_cruce_sel")
+
+        if conv_cruce != "Todos":
+            df_filtrado = df_bases_prev[df_bases_prev["nombre_convenio"] == conv_cruce]
+        else:
+            df_filtrado = df_bases_prev
+
+        tipos_disp = ["Todos"] + sorted(df_filtrado["tipo_base"].unique().tolist())
+        tipo_cruce = st.selectbox("Tipo de base", tipos_disp, key="tipo_cruce_sel")
+
+        if tipo_cruce != "Todos":
+            n = len(df_filtrado[df_filtrado["tipo_base"] == tipo_cruce])
+        else:
+            n = len(df_filtrado)
+        st.caption(f"📋 **{n:,}** registros a cruzar")
+
+        if st.button("🔀 Ejecutar cruce por base", type="primary",
+                     use_container_width=True, key="btn_cruce_base"):
+            with st.spinner("Ejecutando cruce..."):
+                try:
+                    df_bases = df_filtrado.copy()
+                    if tipo_cruce != "Todos":
+                        df_bases = df_bases[df_bases["tipo_base"] == tipo_cruce]
+
+                    df_fact = cargar_facturado()
+                    if df_fact is None:
+                        st.error("❌ No se pudo cargar el facturado guardado.")
+                        return
+
+                    df_cruzado = cruzar_bases_con_facturado(
+                        df_bases, df_fact, st.session_state.config
+                    )
+                    st.session_state["df_cruce_resultado"] = df_cruzado
+                    st.session_state["mes_cruce_label"] = tipo_cruce if tipo_cruce != "Todos" else conv_cruce
+                    st.success(f"✅ Cruce completado — {len(df_cruzado):,} registros.")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
 
     # ── Resultados del cruce ──────────────────────────────────
     df_cruce = st.session_state.get("df_cruce_resultado")
@@ -220,7 +290,8 @@ def render_tab_facturado():
         cols_det = [
             "nombre_convenio", "tipo_base", "documento_paciente",
             "nombre_paciente", "cups", "descripcion_servicio",
-            "fecha_atencion", "facturador", "estado", "archivo_origen",
+            "fecha_atencion", "facturador", "estado", "llave_cruce",
+            "archivo_origen",
         ]
         cols_det = [c for c in cols_det if c in df_no_fact.columns]
         st.caption(f"{len(df_no_fact):,} registros sin cruce")
@@ -266,17 +337,56 @@ def render_tab_facturado():
         )
 
     with col_d2:
-        # Excel con 3 hojas
-        hojas = {
-            "Resumen Convenio":   resumen_cruce_por_convenio(df_cruce),
-            "Resumen Tipo Base":  resumen_cruce_por_tipo_base(df_cruce),
-            "No Facturados":      df_no_fact[cols_det] if not df_no_fact.empty else df_no_fact,
-        }
-        st.download_button(
-            "⬇️ Reporte cruce Excel",
-            data=_excel(hojas),
-            file_name=f"cruce_{_nombre_seguro(mes_cruce_label)}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key="dl_cruce_xlsx",
-        )
+        with col_d2:
+            # Hoja "Facturados" — cruce exitoso con columnas de ambos lados
+            df_fact_cargado = cargar_facturado()
+            df_facturados = df_cruce[df_cruce["estado_cruce"] == "Facturado"].copy()
+
+            cols_base_fact = [
+                "nombre_convenio", "tipo_base", "documento_paciente",
+                "nombre_paciente", "cups", "descripcion_servicio",
+                "FECHA DE INICIO DEL SERVICIO", "facturador", "observacion",
+                "estado", "llave_cruce", "archivo_origen",
+            ]
+            cols_base_fact = [c for c in cols_base_fact if c in df_facturados.columns]
+
+            # Traer columnas del facturado haciendo merge por llave
+            COLS_FACT = [
+                "FACTURA", "FECHA LEGALIZACION", "FECHA FACTURA", "CUFE",
+                "TIPO IDENTIFICACIÓN", "IDENTIFICACION", "PACIENTE",
+                "FECHA RADICADO", "RADICADO EXTERNO", "MES", "AÑO",
+            ]
+
+            if df_fact_cargado is not None and not df_facturados.empty:
+                # Reconstruir llave en facturado para el merge
+                from core.cruce import _construir_llave, LLAVE_FACTURADO_DEFAULT, COL_CUPS_FACTURADO
+                df_fact_activo = df_fact_cargado[df_fact_cargado["_estado_factura"] == "Activo"].copy()
+                cols_llave_fact = list(LLAVE_FACTURADO_DEFAULT)
+                if COL_CUPS_FACTURADO in df_fact_activo.columns:
+                    cols_llave_fact.append(COL_CUPS_FACTURADO)
+                df_fact_activo["llave_cruce"] = _construir_llave(df_fact_activo, cols_llave_fact)
+
+                cols_fact_disp = [c for c in COLS_FACT if c in df_fact_activo.columns]
+                df_fact_merge = df_fact_activo[["llave_cruce"] + cols_fact_disp].drop_duplicates("llave_cruce")
+
+                df_hoja_fact = (
+                    df_facturados[cols_base_fact]
+                    .merge(df_fact_merge, on="llave_cruce", how="left")
+                )
+            else:
+                df_hoja_fact = df_facturados[cols_base_fact] if not df_facturados.empty else pd.DataFrame()
+
+            hojas = {
+                "Resumen Convenio": resumen_cruce_por_convenio(df_cruce),
+                "Resumen Tipo Base": resumen_cruce_por_tipo_base(df_cruce),
+                "Facturados": df_hoja_fact,
+                "No Facturados": df_no_fact[cols_det] if not df_no_fact.empty else df_no_fact,
+            }
+            st.download_button(
+                "⬇️ Reporte cruce Excel",
+                data=_excel(hojas),
+                file_name=f"cruce_{_nombre_seguro(mes_cruce_label)}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="dl_cruce_xlsx",
+            )
