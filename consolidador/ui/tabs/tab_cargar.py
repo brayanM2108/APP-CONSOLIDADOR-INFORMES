@@ -1,9 +1,10 @@
 """Tab 'Cargar manual' — subida de archivos con asignación de tipo."""
 
+import re
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-
 from ui.estado import MESES
 from core.procesador import procesar_base
 from core.exportador import guardar_parquet
@@ -67,6 +68,33 @@ def _asignar_tipos(archivos):
 
     return tipos_asignados
 
+def _periodo_desde_nombre(nombre_archivo: str) -> tuple[str | None, int | None]:
+    """
+    Extrae mes/año desde nombres tipo: BASE_NOMBREEPS_MES_AÑO.xlsx
+    Ej: BASE_CAPITALSALUD_MARZO_2025.xlsx -> ("03", 2025)
+
+    Retorna (None, None) si no detecta.
+    """
+    stem = Path(nombre_archivo).stem.upper().replace("-", "_")
+    tokens = [t.strip() for t in stem.split("_") if t.strip()]
+
+    # {"ENERO": "01", ..., "DICIEMBRE": "12"}
+    meses_txt_a_num = {v.upper(): k for k, v in MESES.items()}
+
+    mes = None
+    for t in tokens:
+        if t in meses_txt_a_num:
+            mes = meses_txt_a_num[t]
+            break
+
+    ano = None
+    for t in reversed(tokens):
+        if re.fullmatch(r"20\d{2}", t):
+            ano = int(t)
+            break
+
+    return mes, ano
+
 
 def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
     puede_procesar = bool(archivos) and len(tipos_asignados) > 0
@@ -87,11 +115,24 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
                 try:
                     archivo.seek(0)
                     df_raw = pd.read_excel(archivo)
+
+                    # Detectar periodo por nombre de archivo; fallback al selector
+                    mes_arch, año_arch = _periodo_desde_nombre(archivo.name)
+                    mes_final = mes_arch or mes_sel
+                    año_final = int(año_arch or año_sel)
+
                     df_proc, warns = procesar_base(
                         df_raw, config_base,
-                        archivo.name, tipo_base, mes_sel, año_sel,
+                        archivo.name, tipo_base, mes_final, año_final,
                     )
                     dfs_prev.append(df_proc)
+
+                    if mes_arch is None or año_arch is None:
+                        warns.append(
+                            f"'{archivo.name}': no se detectó mes/año completo en el nombre; "
+                            f"se usó período seleccionado ({MESES[mes_sel]} {año_sel})."
+                        )
+
                     adverts.extend(warns)
                 except Exception as e:
                     errores.append(f"**{archivo.name}**: {e}")
@@ -110,29 +151,44 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
             use_container_width=True, key="procesar_m",
         ):
             dfs = st.session_state.pop("preview_m")
-            mes_nuevo = f"{MESES[mes_sel]}_{año_sel}"
-
             df_nuevos = pd.concat(dfs, ignore_index=True)
-            if (
-                st.session_state.df_resultado is not None
-                and st.session_state.mes_label == mes_nuevo
-            ):
+
+            # Actualiza sesión con todo lo procesado
+            if st.session_state.df_resultado is not None:
                 st.session_state.df_resultado = pd.concat(
                     [st.session_state.df_resultado, df_nuevos], ignore_index=True
                 )
             else:
                 st.session_state.df_resultado = df_nuevos
 
-            st.session_state.mes_label = mes_nuevo
-            st.session_state.modo_reporte = "mes"
-            total = len(st.session_state.df_resultado)
+            # Guardar por cada (año, mes) detectado
+            rutas_guardadas = []
+            errores_guardado = []
+            for (año_g, mes_g), df_mes in df_nuevos.groupby(["año", "mes"], dropna=False):
+                try:
+                    mes_norm = str(mes_g).zfill(2)
+                    mes_txt = MESES.get(mes_norm, mes_norm)
+                    mes_label = f"{mes_txt}_{int(año_g)}"
+                    ruta = guardar_parquet(df_mes, mes_label)
+                    rutas_guardadas.append(str(ruta))
+                except Exception as e:
+                    errores_guardado.append(f"{mes_g}-{año_g}: {e}")
 
-            try:
-                ruta = guardar_parquet(st.session_state.df_resultado, mes_nuevo)
-                st.success(f"✅ {total:,} registros guardados en `{ruta}`. Ve a **📊 Reporte**.")
-            except Exception as e:
-                st.success(f"✅ {total:,} registros procesados. Ve a **📊 Reporte**.")
-                st.warning(f"⚠️ No se pudo guardar en Parquet: {e}.")
+            # Modo convenio para análisis multi-mes
+            st.session_state.mes_label = "Carga_manual_multi_mes"
+            st.session_state.modo_reporte = "convenio"
+
+            total = len(st.session_state.df_resultado)
+            if rutas_guardadas:
+                st.success(
+                    f"✅ {total:,} registros procesados. "
+                    f"Guardados {len(rutas_guardadas)} período(s) en Parquet. "
+                    "Ve a **📊 Reporte**."
+                )
+            if errores_guardado:
+                st.warning("⚠️ Algunos períodos no se pudieron guardar:")
+                for e in errores_guardado:
+                    st.markdown(f"- {e}")
 
     # Resultado de verificación
     if st.session_state.get("advertencias_m"):
