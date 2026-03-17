@@ -264,14 +264,41 @@ def _bases_consolidadas():
     label_mes = f" en **{mes_filtro}**" if mes_filtro != "Todos" else ""
     st.caption(f"{len(archivos_conv)} archivo(s) consolidado(s) para {label_filtro}{label_mes}:")
 
+
+    # ── Selección múltiple para borrado rápido ────────────────
+    def _key_sel(nombre: str) -> str:
+        safe = (
+            nombre.replace(" ", "_")
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(".", "_")
+            .replace(":", "_")
+        )
+        return f"bulk_del_{safe}"
+
+    # Limpiar selección en un rerun posterior (antes de instanciar widgets)
+    if st.session_state.get("bulk_clear_pending", False):
+        for k in list(st.session_state.keys()):
+            if k.startswith("bulk_del_"):
+                st.session_state[k] = False
+        st.session_state["bulk_clear_pending"] = False
+
+
+    seleccionados = []
+
     for a in archivos_conv:
-        col_a, col_btn = st.columns([5, 1])
+        col_chk, col_a, col_btn = st.columns([0.6, 4.4, 1])
+        with col_chk:
+            marcado = st.checkbox("", key=_key_sel(a))
+            if marcado:
+                seleccionados.append(a)
         with col_a:
             st.markdown(f'<span class="badge">📄 {a}</span>', unsafe_allow_html=True)
         with col_btn:
             if st.button("🗑️", key=f"del_{a}", help=f"Eliminar {a}"):
                 st.session_state[f"confirm_del_{a}"] = True
 
+        # Borrado individual (se mantiene)
         if st.session_state.get(f"confirm_del_{a}"):
             st.warning(f"⚠️ ¿Eliminar **{a}** del Parquet permanentemente?")
             col_si, col_no = st.columns(2)
@@ -293,7 +320,75 @@ def _bases_consolidadas():
                             f"✅ {resultado['eliminados']:,} registros eliminados · "
                             f"Meses afectados: {meses_txt}"
                         )
-                with col_no:
-                    if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
-                        st.session_state.pop(f"confirm_del_{a}", None)
                         st.rerun()
+            with col_no:
+                if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
+                    st.session_state.pop(f"confirm_del_{a}", None)
+                    st.rerun()
+
+    # ── Acción masiva ────────────────────────────────────────
+    st.divider()
+    col_b1, col_b2 = st.columns([2, 1])
+
+    with col_b1:
+        st.caption(f"Seleccionados: **{len(seleccionados)}**")
+
+    with col_b2:
+        if st.button(
+            f"🗑️ Eliminar seleccionados ({len(seleccionados)})",
+            type="primary",
+            use_container_width=True,
+            disabled=len(seleccionados) == 0,
+            key="btn_bulk_delete",
+        ):
+            st.session_state["confirm_bulk_delete"] = True
+
+    if st.session_state.get("confirm_bulk_delete"):
+        st.warning(
+            f"⚠️ Vas a eliminar **{len(seleccionados)}** archivo(s) del Parquet de forma permanente."
+        )
+        csi, cno = st.columns(2)
+        with csi:
+            if st.button("✅ Sí, eliminar seleccionados", type="primary", use_container_width=True, key="yes_bulk_delete"):
+                total_eliminados = 0
+                meses_afectados = set()
+                errores = []
+
+                for nombre_archivo in seleccionados:
+                    resultado = eliminar_archivo_de_parquet(nombre_archivo)
+                    if resultado["error"]:
+                        errores.append(f"{nombre_archivo}: {resultado['error']}")
+                    else:
+                        total_eliminados += int(resultado["eliminados"])
+                        for m in resultado["meses_afectados"]:
+                            meses_afectados.add(m)
+
+                # Limpiar en memoria (df_resultado actual)
+                if st.session_state.df_resultado is not None and seleccionados:
+                    df_actual = st.session_state.df_resultado
+                    df_filtrado = df_actual[
+                        ~df_actual["archivo_origen"].isin(seleccionados)
+                    ].reset_index(drop=True)
+                    st.session_state.df_resultado = None if df_filtrado.empty else df_filtrado
+
+                # Pedir limpieza de checkboxes para el siguiente rerun
+                st.session_state["bulk_clear_pending"] = True
+
+                st.session_state["confirm_bulk_delete"] = False
+
+                if errores:
+                    st.error("❌ Hubo errores en algunas eliminaciones:")
+                    for e in errores:
+                        st.markdown(f"- {e}")
+
+                meses_txt = ", ".join(sorted(meses_afectados)) if meses_afectados else "ninguno"
+                st.success(
+                    f"✅ {total_eliminados:,} registros eliminados en borrado masivo · "
+                    f"Meses afectados: {meses_txt}"
+                )
+                st.rerun()
+
+        with cno:
+            if st.button("❌ Cancelar", use_container_width=True, key="no_bulk_delete"):
+                st.session_state["confirm_bulk_delete"] = False
+                st.rerun()
