@@ -289,7 +289,7 @@ def nombre_tipo_base_archivo(tipo_base: str, mes_label: str, ext: str) -> str:
 # PARQUET — almacenamiento interno eficiente
 # ════════════════════════════════════════════════════════════
 
-PARQUET_DIR = Path("datos/parquet")
+PARQUET_DIR = Path(__file__).parent.parent / "datos" / "parquet"
 
 
 def guardar_parquet(df: pd.DataFrame, mes_label: str) -> Path:
