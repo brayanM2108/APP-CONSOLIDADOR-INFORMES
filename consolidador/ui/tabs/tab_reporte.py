@@ -21,7 +21,7 @@ def render_tab_reporte():
 
     if df_total is None or df_total.empty:
         st.info("Carga datos desde el historial o procesa archivos primero.")
-        st.stop()
+        return
 
     if modo == "mes":
         _reporte_mes(df_total, mes_label)

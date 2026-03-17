@@ -21,7 +21,6 @@ def render_tab_archivos():
     carpeta_raiz = st.session_state.get("carpeta_datos", "")
     if not carpeta_raiz:
         st.info("👈 Define la carpeta raíz de datos en el panel izquierdo.")
-        st.stop()
 
     mes_w = _selector_mes()
     archivos_scan = st.session_state.get("archivos_escaneados", [])
