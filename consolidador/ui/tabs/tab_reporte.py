@@ -52,7 +52,7 @@ def _reporte_mes(df_total, mes_label):
             rc.style.background_gradient(
                 subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
             ),
-            use_container_width=True, hide_index=True,
+            width = "stretch", hide_index=True,
         )
 
     st.divider()
@@ -63,7 +63,7 @@ def _reporte_mes(df_total, mes_label):
     if rf.empty:
         st.success("🎉 No hay pendientes.")
     else:
-        st.dataframe(rf, use_container_width=True, hide_index=True)
+        st.dataframe(rf, width = "stretch", hide_index=True)
 
     st.divider()
 
@@ -77,7 +77,7 @@ def _reporte_mes(df_total, mes_label):
         filtro = st.selectbox("Filtrar por convenio", convs, key="det_conv_mes")
         df_det = detalle_pendientes(df, filtro)
         st.caption(f"{len(df_det):,} registros")
-        st.dataframe(df_det, use_container_width=True, hide_index=True)
+        st.dataframe(df_det, width = "stretch", hide_index=True)
 
     st.divider()
 
@@ -163,7 +163,7 @@ def _reporte_convenio(df_total, mes_label):
         resumen_mes.style.background_gradient(
             subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
         ),
-        use_container_width=True, hide_index=True,
+        width = "stretch", hide_index=True,
     )
 
     # ── Resumen por convenio (solo si se cargaron todos) ─────────────
@@ -176,7 +176,7 @@ def _reporte_convenio(df_total, mes_label):
                 rc.style.background_gradient(
                     subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
                 ),
-                use_container_width=True, hide_index=True,
+                width = "stretch", hide_index=True,
             )
 
     st.divider()
@@ -187,7 +187,7 @@ def _reporte_convenio(df_total, mes_label):
     if rf.empty:
         st.success("🎉 No hay pendientes.")
     else:
-        st.dataframe(rf, use_container_width=True, hide_index=True)
+        st.dataframe(rf, width = "stretch", hide_index=True)
 
     st.divider()
 
@@ -203,7 +203,7 @@ def _reporte_convenio(df_total, mes_label):
         ]
         cols_det = [c for c in cols_det if c in df_pend.columns]
         st.caption(f"{len(df_pend):,} registros pendientes")
-        st.dataframe(df_pend[cols_det], use_container_width=True, hide_index=True)
+        st.dataframe(df_pend[cols_det], width = "stretch", hide_index=True)
 
     st.divider()
 

@@ -103,7 +103,7 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
     with col_v:
         if st.button(
             "🔍 Verificar", disabled=not puede_procesar,
-            use_container_width=True, key="verificar_m",
+            width = "stretch", key="verificar_m",
         ):
             dfs_prev, adverts, errores = [], [], []
             archivos_ok = [a for a in archivos if a.name in tipos_asignados]
@@ -148,7 +148,7 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
         if st.button(
             "▶️ Procesar y guardar", type="primary",
             disabled=not hay_preview,
-            use_container_width=True, key="procesar_m",
+            width = "stretch", key="procesar_m",
         ):
             dfs = st.session_state.pop("preview_m")
             df_nuevos = pd.concat(dfs, ignore_index=True)

@@ -1,6 +1,7 @@
 """Tab 'Facturado' — carga y almacenamiento del archivo de facturado."""
 import pandas as pd
 import streamlit as st
+from core.procesador import COLUMNAS as COLS_STD
 from core.facturado import (
     leer_facturado,
     kpis_facturado,
@@ -107,7 +108,7 @@ def render_tab_facturado():
         if st.button(
             "✅ Confirmar y guardar",
             type="primary",
-            use_container_width=True,
+            width = "stretch",
             key="btn_guardar_facturado",
         ):
             with st.spinner("Guardando..."):
@@ -137,12 +138,12 @@ def render_tab_facturado():
 
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        if st.button("📅 Cruce por mes", use_container_width=True, key="btn_modo_mes"):
+        if st.button("📅 Cruce por mes", width = "stretch", key="btn_modo_mes"):
             st.session_state["modo_cruce"] = "mes"
             st.session_state.pop("df_cruce_resultado", None)
             st.rerun()
     with col_m2:
-        if st.button("🗂️ Cruce por base", use_container_width=True, key="btn_modo_base"):
+        if st.button("🗂️ Cruce por base", width = "stretch", key="btn_modo_base"):
             st.session_state["modo_cruce"] = "base"
             st.session_state.pop("df_cruce_resultado", None)
             st.rerun()
@@ -164,7 +165,7 @@ def render_tab_facturado():
             st.caption(f"📋 **{len(df_bases_prev):,}** registros a cruzar")
 
         if st.button("🔀 Ejecutar cruce por mes", type="primary",
-                     use_container_width=True, key="btn_cruce_mes"):
+                     width = "stretch", key="btn_cruce_mes"):
             with st.spinner("Ejecutando cruce..."):
                 try:
                     df_bases = cargar_parquet(mes_cruce.replace(" ", "_"))
@@ -218,7 +219,7 @@ def render_tab_facturado():
         st.caption(f"📋 **{n:,}** registros a cruzar")
 
         if st.button("🔀 Ejecutar cruce por base", type="primary",
-                     use_container_width=True, key="btn_cruce_base"):
+                     width = "stretch", key="btn_cruce_base"):
             with st.spinner("Ejecutando cruce..."):
                 try:
                     df_bases = df_filtrado.copy()
@@ -265,7 +266,7 @@ def render_tab_facturado():
             rc.style.background_gradient(
                 subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
             ),
-            use_container_width=True, hide_index=True,
+            width = "stretch", hide_index=True,
         )
 
     st.divider()
@@ -277,7 +278,7 @@ def render_tab_facturado():
             rt.style.background_gradient(
                 subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100
             ),
-            use_container_width=True, hide_index=True,
+            width = "stretch", hide_index=True,
         )
 
     st.divider()
@@ -287,15 +288,18 @@ def render_tab_facturado():
     if df_no_fact.empty:
         st.success("🎉 Todos los registros cruzaron con el facturado.")
     else:
-        cols_det = [
+        cols_base_no_fact = [
             "nombre_convenio", "tipo_base", "documento_paciente",
             "nombre_paciente", "cups", "descripcion_servicio",
-            "fecha_atencion", "facturador", "estado", "llave_cruce",
-            "archivo_origen",
+            "fecha_atencion", "FECHA DE INICIO DEL SERVICIO",
+            "facturador", "estado", "llave_cruce", "archivo_origen",
+            "mes", "año",
         ]
-        cols_det = [c for c in cols_det if c in df_no_fact.columns]
+
+
+        cols_det = [c for c in (cols_base_no_fact ) if c in df_no_fact.columns]
         st.caption(f"{len(df_no_fact):,} registros sin cruce")
-        st.dataframe(df_no_fact[cols_det], use_container_width=True, hide_index=True)
+        st.dataframe(df_no_fact[cols_base_no_fact], width = "stretch", hide_index=True)
 
     st.divider()
 
@@ -308,7 +312,7 @@ def render_tab_facturado():
     if st.button(
             "💾 Guardar cruce en Parquet",
             type="primary",
-            use_container_width=True,
+            width = "stretch",
             key="btn_guardar_cruce",
     ):
         with st.spinner("Guardando..."):
@@ -332,7 +336,7 @@ def render_tab_facturado():
             data=_csv(df_no_fact[cols_det] if not df_no_fact.empty else df_no_fact),
             file_name=f"no_facturados_{_nombre_seguro(mes_cruce_label)}.csv",
             mime="text/csv",
-            use_container_width=True,
+            width = "stretch",
             key="dl_no_fact_csv",
         )
 
@@ -387,6 +391,6 @@ def render_tab_facturado():
                 data=_excel(hojas),
                 file_name=f"cruce_{_nombre_seguro(mes_cruce_label)}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+                width = "stretch",
                 key="dl_cruce_xlsx",
             )

@@ -53,7 +53,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
         st.download_button(
             "⬇️ General CSV", data=general_csv(df),
             file_name=nombre_general(label, "csv"),
-            mime="text/csv", use_container_width=True,
+            mime="text/csv", width = "stretch",
             key=f"dl_gen_csv_{key_suffix}",
         )
     with c2:
@@ -61,7 +61,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
             "⬇️ General Excel", data=general_excel(df),
             file_name=nombre_general(label, "xlsx"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width = "stretch",
             key=f"dl_gen_xlsx_{key_suffix}",
         )
 
@@ -84,7 +84,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
         st.download_button(
             f"⬇️ {conv_sel} CSV", data=convenio_csv(df, conv_sel),
             file_name=nombre_convenio_archivo(conv_sel, label, "csv"),
-            mime="text/csv", use_container_width=True,
+            mime="text/csv", width = "stretch",
             key=f"dl_conv_csv_{key_suffix}",
         )
     with c4:
@@ -92,7 +92,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
             f"⬇️ {conv_sel} Excel", data=convenio_excel(df, conv_sel),
             file_name=nombre_convenio_archivo(conv_sel, label, "xlsx"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width = "stretch",
             key=f"dl_conv_xlsx_{key_suffix}",
         )
 
@@ -115,7 +115,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
         st.download_button(
             f"⬇️ {tipo_sel} CSV", data=tipo_base_csv(df, tipo_sel),
             file_name=nombre_tipo_base_archivo(tipo_sel, label, "csv"),
-            mime="text/csv", use_container_width=True,
+            mime="text/csv", width = "stretch",
             key=f"dl_tipo_csv_{key_suffix}",
         )
     with c6:
@@ -123,6 +123,6 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
             f"⬇️ {tipo_sel} Excel", data=tipo_base_excel(df, tipo_sel),
             file_name=nombre_tipo_base_archivo(tipo_sel, label, "xlsx"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width = "stretch",
             key=f"dl_tipo_xlsx_{key_suffix}",
         )

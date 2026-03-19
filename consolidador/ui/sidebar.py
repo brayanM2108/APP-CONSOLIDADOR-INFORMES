@@ -73,7 +73,7 @@ def _form_nuevo_tipo():
                 label_visibility="collapsed",
             )
 
-            if st.form_submit_button("💾 Guardar", type="primary", use_container_width=True):
+            if st.form_submit_button("💾 Guardar", type="primary", width = "stretch"):
                 if not nombre_tipo or not col_pac or not col_fact:
                     st.error("Nombre, doc. paciente y col. facturación son obligatorios.")
                 else:
@@ -137,7 +137,7 @@ def _carpeta_y_mapeo():
             label_visibility="collapsed",
         )
 
-        if st.button("💾 Guardar mapeo", use_container_width=True):
+        if st.button("💾 Guardar mapeo", width = "stretch"):
             nuevo_mapeo = {}
             for linea in mapeo_input.splitlines():
                 linea = linea.strip()
@@ -166,7 +166,7 @@ def _historial():
 
         if modo_carga == "Mes":
             mes_sel_h = st.selectbox("Mes", meses_disp, key="hist_mes_sel")
-            if st.button("📥 Cargar mes", use_container_width=True, key="btn_cargar_mes"):
+            if st.button("📥 Cargar mes", width = "stretch", key="btn_cargar_mes"):
                 df_cargado = cargar_parquet(mes_sel_h.replace(" ", "_"))
                 if df_cargado is not None:
                     st.session_state.df_resultado = df_cargado
@@ -179,7 +179,7 @@ def _historial():
             conv_sel_h = st.selectbox(
                 "Convenio", ["Todos"] + convenios_disp, key="hist_conv_sel"
             )
-            if st.button("📥 Cargar convenio", use_container_width=True, key="btn_cargar_conv"):
+            if st.button("📥 Cargar convenio", width = "stretch", key="btn_cargar_conv"):
                 if conv_sel_h == "Todos":
                     df_conv_h = df_hist_all.copy()
                     label = "Todos los convenios"

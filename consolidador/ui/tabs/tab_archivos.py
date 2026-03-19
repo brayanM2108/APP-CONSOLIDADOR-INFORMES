@@ -49,7 +49,7 @@ def _selector_mes():
         )
     with w2:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔍 Escanear carpeta", use_container_width=True):
+        if st.button("🔍 Escanear carpeta", width = "stretch"):
             carpeta_raiz = st.session_state.get("carpeta_datos", "")
             st.session_state["archivos_escaneados"] = escanear(
                 carpeta_raiz, mes_w,
@@ -116,7 +116,7 @@ def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
     with col_v:
         if st.button(
             "🔍 Verificar", disabled=not puede_procesar_w,
-            use_container_width=True, key="verificar_w",
+            width = "stretch", key="verificar_w",
         ):
             dfs_prev, advertencias, errores = [], [], []
             progress = st.progress(0)
@@ -146,7 +146,7 @@ def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
         if st.button(
             "▶️ Procesar y guardar", type="primary",
             disabled=not hay_preview,
-            use_container_width=True, key="procesar_w",
+            width = "stretch", key="procesar_w",
         ):
             dfs = st.session_state.pop("preview_w")
             sels = st.session_state.pop("seleccionados_w")
@@ -289,7 +289,11 @@ def _bases_consolidadas():
     for a in archivos_conv:
         col_chk, col_a, col_btn = st.columns([0.6, 4.4, 1])
         with col_chk:
-            marcado = st.checkbox("", key=_key_sel(a))
+            marcado = st.checkbox(
+                "Seleccionar base",
+                key=_key_sel(a),
+                label_visibility="collapsed",
+            )
             if marcado:
                 seleccionados.append(a)
         with col_a:
@@ -303,7 +307,7 @@ def _bases_consolidadas():
             st.warning(f"⚠️ ¿Eliminar **{a}** del Parquet permanentemente?")
             col_si, col_no = st.columns(2)
             with col_si:
-                if st.button("✅ Sí, eliminar", key=f"si_{a}", type="primary", use_container_width=True):
+                if st.button("✅ Sí, eliminar", key=f"si_{a}", type="primary", width = "stretch"):
                     resultado = eliminar_archivo_de_parquet(a)
                     if resultado["error"]:
                         st.error(f"Error: {resultado['error']}")
@@ -322,7 +326,7 @@ def _bases_consolidadas():
                         )
                         st.rerun()
             with col_no:
-                if st.button("❌ Cancelar", key=f"no_{a}", use_container_width=True):
+                if st.button("❌ Cancelar", key=f"no_{a}", width = "stretch"):
                     st.session_state.pop(f"confirm_del_{a}", None)
                     st.rerun()
 
@@ -337,7 +341,7 @@ def _bases_consolidadas():
         if st.button(
             f"🗑️ Eliminar seleccionados ({len(seleccionados)})",
             type="primary",
-            use_container_width=True,
+            width = "stretch",
             disabled=len(seleccionados) == 0,
             key="btn_bulk_delete",
         ):
@@ -349,7 +353,7 @@ def _bases_consolidadas():
         )
         csi, cno = st.columns(2)
         with csi:
-            if st.button("✅ Sí, eliminar seleccionados", type="primary", use_container_width=True, key="yes_bulk_delete"):
+            if st.button("✅ Sí, eliminar seleccionados", type="primary", width = "stretch", key="yes_bulk_delete"):
                 total_eliminados = 0
                 meses_afectados = set()
                 errores = []
@@ -389,6 +393,6 @@ def _bases_consolidadas():
                 st.rerun()
 
         with cno:
-            if st.button("❌ Cancelar", use_container_width=True, key="no_bulk_delete"):
+            if st.button("❌ Cancelar", width = "stretch", key="no_bulk_delete"):
                 st.session_state["confirm_bulk_delete"] = False
                 st.rerun()
