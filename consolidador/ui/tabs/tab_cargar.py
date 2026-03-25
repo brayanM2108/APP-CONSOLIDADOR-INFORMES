@@ -8,7 +8,7 @@ from datetime import datetime
 from ui.estado import MESES
 from core.procesador import procesar_base
 from core.exportador import guardar_parquet
-
+from core.watcher import marcar_procesado
 
 def render_tab_cargar():
     st.subheader("Período")
@@ -95,6 +95,51 @@ def _periodo_desde_nombre(nombre_archivo: str) -> tuple[str | None, int | None]:
 
     return mes, ano
 
+def _ruta_virtual_manual(nombre_archivo: str, tipo_base: str, mes: str, año: int) -> str:
+    """
+    Crea una ruta virtual estable para registrar archivos subidos por file_uploader.
+    No depende de la ruta local del usuario (Streamlit no la expone).
+    """
+    safe_nombre = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(nombre_archivo).name)
+    safe_tipo = re.sub(r"[^A-Za-z0-9._-]+", "_", str(tipo_base))
+    return str(Path("manual_uploads") / str(año) / str(mes).zfill(2) / safe_tipo / safe_nombre)
+
+def _resolver_ruta_real_manual(nombre_archivo: str, tipo_base: str, año: int) -> str | None:
+    """
+    Intenta encontrar la ruta real del archivo dentro de la carpeta raíz configurada.
+    Retorna ruta absoluta normalizada si hay una coincidencia única.
+    """
+    carpeta_raiz = st.session_state.get("carpeta_datos", "")
+    if not carpeta_raiz:
+        return None
+
+    raiz = Path(carpeta_raiz)
+    if not raiz.exists():
+        return None
+
+    candidatos = []
+    for p in raiz.rglob(nombre_archivo):
+        if p.is_file():
+            candidatos.append(p)
+
+    if not candidatos:
+        return None
+
+    cand_ano = [p for p in candidatos if str(año) in p.parts]
+    if len(cand_ano) == 1:
+        return str(cand_ano[0].resolve())
+
+    mapeo = st.session_state.config.get("carpeta_tipo_base", {})
+    carpetas_tipo = [k for k, v in mapeo.items() if str(v).strip() == str(tipo_base).strip()]
+    if carpetas_tipo:
+        cand_tipo = [p for p in candidatos if p.parent.name in carpetas_tipo]
+        if len(cand_tipo) == 1:
+            return str(cand_tipo[0].resolve())
+
+    if len(candidatos) == 1:
+        return str(candidatos[0].resolve())
+
+    return None
 
 def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
     puede_procesar = bool(archivos) and len(tipos_asignados) > 0
@@ -102,10 +147,11 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
 
     with col_v:
         if st.button(
-            "🔍 Verificar", disabled=not puede_procesar,
+        "🔍 Verificar", disabled=not puede_procesar,
             width = "stretch", key="verificar_m",
         ):
             dfs_prev, adverts, errores = [], [], []
+            seleccionados_m = []
             archivos_ok = [a for a in archivos if a.name in tipos_asignados]
             progress = st.progress(0)
 
@@ -116,7 +162,6 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
                     archivo.seek(0)
                     df_raw = pd.read_excel(archivo)
 
-                    # Detectar periodo por nombre de archivo; fallback al selector
                     mes_arch, año_arch = _periodo_desde_nombre(archivo.name)
                     mes_final = mes_arch or mes_sel
                     año_final = int(año_arch or año_sel)
@@ -124,8 +169,15 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
                     df_proc, warns = procesar_base(
                         df_raw, config_base,
                         archivo.name, tipo_base, mes_final, año_final,
-                    )
+                )
                     dfs_prev.append(df_proc)
+
+                    seleccionados_m.append({
+                        "nombre_archivo": archivo.name,
+                        "tipo_base": tipo_base,
+                        "mes": mes_final,
+                        "año": año_final,
+                    })
 
                     if mes_arch is None or año_arch is None:
                         warns.append(
@@ -142,6 +194,7 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
             st.session_state["preview_m"] = dfs_prev
             st.session_state["advertencias_m"] = adverts
             st.session_state["errores_m"] = errores
+            st.session_state["seleccionados_m"] = seleccionados_m  # <-- NUEVO
 
     with col_p:
         hay_preview = bool(st.session_state.get("preview_m"))
@@ -151,9 +204,27 @@ def _verificar_y_procesar(archivos, tipos_asignados, mes_sel, año_sel):
             width = "stretch", key="procesar_m",
         ):
             dfs = st.session_state.pop("preview_m")
+
+            seleccionados_m = st.session_state.pop("seleccionados_m", [])
+            for item in seleccionados_m:
+                ruta_real = _resolver_ruta_real_manual(
+                    item["nombre_archivo"],
+                    item["tipo_base"],
+                    item["año"],
+                )
+
+                ruta_registro = ruta_real or _ruta_virtual_manual(
+                    item["nombre_archivo"],
+                    item["tipo_base"],
+                    item["mes"],
+                    item["año"],
+                )
+
+                marcar_procesado(ruta_registro, item["tipo_base"])
+
+
             df_nuevos = pd.concat(dfs, ignore_index=True)
 
-            # Actualiza sesión con todo lo procesado
             if st.session_state.df_resultado is not None:
                 st.session_state.df_resultado = pd.concat(
                     [st.session_state.df_resultado, df_nuevos], ignore_index=True
