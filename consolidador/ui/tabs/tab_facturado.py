@@ -358,7 +358,7 @@ def render_tab_facturado():
             COLS_FACT = [
                 "FACTURA", "FECHA LEGALIZACION", "FECHA FACTURA", "CUFE",
                 "TIPO IDENTIFICACIÓN", "IDENTIFICACION", "PACIENTE",
-                "FECHA RADICADO", "RADICADO EXTERNO", "MES", "AÑO",
+                "FECHA RADICADO", "RADICADO EXTERNO", "MES", "AÑO"
             ]
 
             if df_fact_cargado is not None and not df_facturados.empty:
@@ -380,11 +380,32 @@ def render_tab_facturado():
             else:
                 df_hoja_fact = df_facturados[cols_base_fact] if not df_facturados.empty else pd.DataFrame()
 
+            df_no_fact_export = df_no_fact.copy()
+
+            df_fact_cargado = cargar_facturado()
+            if df_fact_cargado is not None and not df_no_fact_export.empty:
+                from core.cruce import _construir_llave, LLAVE_FACTURADO_DEFAULT, COL_CUPS_FACTURADO
+
+                df_fact_all = df_fact_cargado.copy()
+                cols_llave_fact = list(LLAVE_FACTURADO_DEFAULT)
+                if COL_CUPS_FACTURADO in df_fact_all.columns:
+                    cols_llave_fact.append(COL_CUPS_FACTURADO)
+
+                df_fact_all["llave_cruce"] = _construir_llave(df_fact_all, cols_llave_fact)
+
+                cols_fact_no_fact = [c for c in ["FACTURA", "_estado_factura"] if c in df_fact_all.columns]
+                df_fact_merge_nf = df_fact_all[["llave_cruce"] + cols_fact_no_fact].drop_duplicates("llave_cruce")
+
+                df_no_fact_export = df_no_fact_export.merge(df_fact_merge_nf, on="llave_cruce", how="left")
+
+                cols_no_fact_final = cols_det + [c for c in ["FACTURA", "_estado_factura"] if
+                                                 c in df_no_fact_export.columns]
+
             hojas = {
                 "Resumen Convenio": resumen_cruce_por_convenio(df_cruce),
                 "Resumen Tipo Base": resumen_cruce_por_tipo_base(df_cruce),
                 "Facturados": df_hoja_fact,
-                "No Facturados": df_no_fact[cols_det] if not df_no_fact.empty else df_no_fact,
+                "No Facturados": df_no_fact_export[cols_no_fact_final] if not df_no_fact_export.empty else df_no_fact_export,
             }
             st.download_button(
                 "⬇️ Reporte cruce Excel",
