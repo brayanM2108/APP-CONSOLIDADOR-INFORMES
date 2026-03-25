@@ -3,9 +3,7 @@ app.py
 Punto de entrada de la aplicación Streamlit.
 Delega toda la lógica de UI a los módulos en ui/.
 """
-
 import streamlit as st
-
 from ui.estilos import configurar_pagina, aplicar_estilos
 from ui.estado import inicializar_estado
 from ui.sidebar import render_sidebar
@@ -13,6 +11,7 @@ from ui.tabs.tab_archivos import render_tab_archivos
 from ui.tabs.tab_cargar import render_tab_cargar
 from ui.tabs.tab_reporte import render_tab_reporte
 from ui.tabs.tab_facturado import render_tab_facturado
+from ui.tabs.tab_informe import render_tab_informe
 
 # ── Configuración inicial ────────────────────────────────────
 configurar_pagina()
@@ -37,8 +36,8 @@ if not st.session_state.config:
     st.info("👈 Crea los tipos de base en el panel izquierdo para comenzar.")
     st.stop()
 
-tab_archivos, tab_cargar, tab_reporte, tab_facturado = st.tabs([
-    "📂 Archivos del mes", "📁 Cargar manual", "📊 Reporte", "📋 Facturado"
+tab_archivos, tab_cargar, tab_reporte, tab_facturado, tab_informe = st.tabs([
+    "📂 Archivos del mes", "📁 Cargar manual", "📊 Reporte", "📋 Facturado", "🧾Informe Facturacion"
 ])
 
 with tab_archivos:
@@ -52,3 +51,6 @@ with tab_reporte:
 
 with tab_facturado:
     render_tab_facturado()
+
+with tab_informe:
+    render_tab_informe()
