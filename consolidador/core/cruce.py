@@ -20,12 +20,20 @@ from core.exportador import PARQUET_DIR
 from pathlib import Path
 
 # Llave general por defecto
-LLAVE_BASE_DEFAULT      = ["documento_paciente", "fecha_atencion", "cups"]
-LLAVE_FACTURADO_DEFAULT = ["IDENTIFICACION", "FECHA FACTURA"]
+LLAVE_BASE_DEFAULT      = ["DOCUMENTO", "FECHA DE INICIO DEL SERVICIO", "cups"]
+LLAVE_FACTURADO_DEFAULT = ["IDENTIFICACION", "MES"]
 
 # Columna CUPS en facturado (puede no existir)
 COL_CUPS_FACTURADO = "CUPS"
 
+MESES_NUM_A_NOMBRE = {
+    "1": "ENERO", "2": "FEBRERO", "3": "MARZO", "4": "ABRIL",
+    "5": "MAYO", "6": "JUNIO", "7": "JULIO", "8": "AGOSTO",
+    "9": "SEPTIEMBRE", "10": "OCTUBRE", "11": "NOVIEMBRE", "12": "DICIEMBRE",
+    "01": "ENERO", "02": "FEBRERO", "03": "MARZO", "04": "ABRIL",
+    "05": "MAYO", "06": "JUNIO", "07": "JULIO", "08": "AGOSTO",
+    "09": "SEPTIEMBRE",
+}
 
 # ════════════════════════════════════════════════════════════
 # NORMALIZACIÓN
@@ -41,12 +49,43 @@ def _normalizar_fecha(serie: pd.Series) -> pd.Series:
     fechas = pd.to_datetime(serie, errors="coerce")
     return fechas.dt.strftime("%d-%m-%Y").fillna("")
 
+def _normalizar_mes(serie: pd.Series) -> pd.Series:
+    """
+    Convierte el mes a string uppercase: "FEBRERO".
+    Acepta:
+      - Número entero o string: 1, "1", "01", "12"
+      - Nombre: "febrero", "FEBRERO"
+      - Fecha completa: "2025-12-01", "2025-12-01 00:00:00"
+    """
+    def _conv(val):
+        v = str(val).strip()
 
-def _construir_llave(df: pd.DataFrame, columnas: list[str], sep: str = "||") -> pd.Series:
+        # Si parece fecha (contiene - o /) → extraer mes del datetime
+        if "-" in v or "/" in v:
+            try:
+                mes_num = str(pd.to_datetime(v).month)
+                return MESES_NUM_A_NOMBRE.get(mes_num, mes_num)
+            except Exception:
+                pass
+
+        # Si es número → convertir a nombre
+        v_upper = v.upper()
+        return MESES_NUM_A_NOMBRE.get(v_upper, v_upper)
+
+    return serie.apply(_conv)
+
+
+def _es_columna_mes(col: str) -> bool:
     """
-    Construye una llave compuesta concatenando las columnas indicadas.
-    Las columnas de fecha se normalizan automáticamente.
+    Define si una columna debe normalizarse como mes para la llave de cruce.
     """
+    c = str(col).strip().upper()
+    return c in {
+        "MES",
+        "FECHA DE INICIO DEL SERVICIO",
+    }
+
+def _construir_llave(df: pd.DataFrame, columnas: list[str], sep: str = "_") -> pd.Series:
     partes = []
     for col in columnas:
         if col not in df.columns:
@@ -55,13 +94,9 @@ def _construir_llave(df: pd.DataFrame, columnas: list[str], sep: str = "||") -> 
 
         serie = df[col].copy()
 
-        # Detectar si es columna de fecha
-        es_fecha = (
-            "fecha" in col.lower()
-            or pd.api.types.is_datetime64_any_dtype(serie)
-        )
-        if es_fecha:
-            serie = _normalizar_fecha(serie)
+        es_mes = _es_columna_mes(col)
+        if es_mes:
+            serie = _normalizar_mes(serie)
         else:
             serie = _normalizar_str(serie)
 
@@ -75,17 +110,8 @@ def _construir_llave(df: pd.DataFrame, columnas: list[str], sep: str = "||") -> 
 # ════════════════════════════════════════════════════════════
 
 def _preparar_set_facturado(df_fact: pd.DataFrame) -> set:
-    """
-    Construye el set de llaves del facturado (solo Activas).
-    Llave: IDENTIFICACION + FECHA FACTURA [+ CUPS si existe]
-    """
     df_act = df_fact[df_fact["_estado_factura"] == "Activo"].copy()
-
-    cols_llave = list(LLAVE_FACTURADO_DEFAULT)
-    if COL_CUPS_FACTURADO in df_act.columns:
-        cols_llave.append(COL_CUPS_FACTURADO)
-
-    llaves = _construir_llave(df_act, cols_llave)
+    llaves = _construir_llave(df_act, LLAVE_FACTURADO_DEFAULT)
     return set(llaves.tolist())
 
 
@@ -122,24 +148,11 @@ def cruzar_bases_con_facturado(
         grupo = grupo.copy()
 
         # Llave configurada o default
-        conf_tipo  = config.get(tipo_base, {})
+        conf_tipo = config.get(tipo_base, {})
         cols_llave = conf_tipo.get("llave_cruce", LLAVE_BASE_DEFAULT)
-
-        # Construir llave en las bases
-        # Ajustar a misma cantidad de campos que la llave del facturado
-        cols_fact = list(LLAVE_FACTURADO_DEFAULT)
-        if COL_CUPS_FACTURADO in df_facturado.columns:
-            cols_fact.append(COL_CUPS_FACTURADO)
-
-        # Si la llave del facturado tiene CUPS pero la base no lo tiene
-        # en la llave configurada, igualmente incluir cups si existe
-        if len(cols_fact) > len(cols_llave):
-            # Agregar cups a la llave de base si está disponible
-            if "cups" not in [c.lower() for c in cols_llave] and "cups" in grupo.columns:
-                cols_llave = list(cols_llave) + ["cups"]
-
         llave_grupo = _construir_llave(grupo, cols_llave)
 
+        grupo["llave_cruce"] = llave_grupo
         grupo["estado_cruce"] = llave_grupo.apply(
             lambda k: "Facturado" if k in set_facturado else "No facturado"
         )
