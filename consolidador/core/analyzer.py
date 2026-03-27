@@ -1,16 +1,14 @@
 """
-analizador.py
-Responsabilidad: calcular resúmenes, KPIs y agrupaciones.
-Recibe DataFrames limpios y devuelve DataFrames de resumen.
-No sabe nada de interfaz ni de exportación.
+Analyzer
+Responsibility: Calculate summaries, KPIs, and groupings.
+It receives clean DataFrames and returns summary DataFrames. It knows nothing about interface or exporting.
 """
-
 import pandas as pd
+from .processor import columns
 
-
-def kpis_globales(df: pd.DataFrame) -> dict:
+def global_kpis(df: pd.DataFrame) -> dict:
     """
-    Retorna métricas globales del consolidado.
+    Returns global metrics from the consolidated data.
     """
     total    = len(df)
     fact     = (df["estado"] == "Facturado").sum()
@@ -27,9 +25,9 @@ def kpis_globales(df: pd.DataFrame) -> dict:
     }
 
 
-def resumen_por_convenio(df: pd.DataFrame) -> pd.DataFrame:
+def summary_by_agreement(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Agrupa por convenio: total, facturados, pendientes, cumplimiento.
+    Group by agreement: total, invoiced, pending, compliance.
     """
     if df.empty:
         return pd.DataFrame()
@@ -53,9 +51,9 @@ def resumen_por_convenio(df: pd.DataFrame) -> pd.DataFrame:
     ]]
 
 
-def pendientes_por_facturador(df: pd.DataFrame) -> pd.DataFrame:
+def pending_by_biller(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Lista de pendientes agrupados por convenio y facturador.
+    List of pending items grouped by agreement and biller.
     """
     if df.empty:
         return pd.DataFrame()
@@ -82,39 +80,34 @@ def pendientes_por_facturador(df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
-def detalle_pendientes(df: pd.DataFrame, convenio: str | None = None) -> pd.DataFrame:
+def pending_details(df: pd.DataFrame, agreement: str | None = None) -> pd.DataFrame:
     """
-    Detalle fila a fila de los registros pendientes.
-    Si se pasa convenio, filtra por ese convenio.
-    Incluye columnas extra si existen.
+    Detailed row-by-row view of pending records.
+    If an agreement is specified, filter by that agreement.
+    Include extra columns if available.
     """
-    from .procesador import COLUMNAS
 
     df_pend = df[df["estado"] == "Pendiente"].copy()
 
-    if convenio and convenio != "Todos":
-        df_pend = df_pend[df_pend["nombre_convenio"] == convenio]
+    if agreement and agreement != "Todos":
+        df_pend = df_pend[df_pend["nombre_convenio"] == agreement]
 
-    # Columnas base del detalle
     cols_base = [
         "nombre_convenio", "tipo_base", "documento_paciente",
         "nombre_paciente", "descripcion_servicio",
         "facturador", "observacion", "archivo_origen",
     ]
-
-    # Agregar columnas extra (las que no son estándar)
-    cols_extra = [c for c in df_pend.columns if c not in COLUMNAS]
+    cols_extra = [c for c in df_pend.columns if c not in columns]
     return df_pend[cols_base + cols_extra]
 
 
-def columnas_extra_de(df: pd.DataFrame, tipo_base: str) -> list[str]:
+def extra_columns(df: pd.DataFrame, tipo_base: str) -> list[str]:
     """
-    Retorna las columnas extra que tiene un tipo de base especifico.
+    Returns the extra columns that a specific database type has.
     """
-    from .procesador import COLUMNAS
     df_tipo = df[df["tipo_base"] == tipo_base]
-    return [c for c in df_tipo.columns if c not in COLUMNAS]
+    return [c for c in df_tipo.columns if c not in columns]
 
 
-def convenios_disponibles(df: pd.DataFrame) -> list[str]:
+def available_agreements(df: pd.DataFrame) -> list[str]:
     return sorted(df["nombre_convenio"].unique().tolist())
