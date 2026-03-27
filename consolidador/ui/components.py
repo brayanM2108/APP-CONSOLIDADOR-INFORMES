@@ -1,21 +1,20 @@
-"""Componentes reutilizables: KPIs, bloque de descargas."""
-
+"Reusable components: KPIs, download block."
 import streamlit as st
 import pandas as pd
 
-from core.analizador import kpis_globales, convenios_disponibles
-from core.exportador import (
+from core.analyzer import global_kpis, available_agreements
+from core.exporter import (
     general_csv, general_excel,
-    convenio_csv, convenio_excel,
-    tipo_base_csv, tipo_base_excel,
-    nombre_general,
-    nombre_convenio_archivo,
-    nombre_tipo_base_archivo,
+    agreement_csv, agreement_excel,
+    base_type_csv, base_type_excel,
+    general_name,
+    name_agreement_file,
+    name_base_type_file,
 )
 
 
-def mostrar_kpis(df: pd.DataFrame):
-    kpis = kpis_globales(df)
+def show_kpis(df: pd.DataFrame):
+    kpis = global_kpis(df)
     pct = kpis["cumplimiento"]
     color_pct = "verde" if pct >= 80 else "naranja" if pct >= 50 else "rojo"
 
@@ -37,10 +36,10 @@ def mostrar_kpis(df: pd.DataFrame):
         st.markdown("<br>", unsafe_allow_html=True)
 
 
-def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
-    """Renderiza los 3 niveles de descarga."""
+def download_block(df: pd.DataFrame, label: str, key_suffix: str = ""):
+    """Renders the 3 download levels."""
 
-    # Nivel 1 — General
+    # level 1 — General
     st.markdown(
         '<div class="nivel-header">'
         '<div class="nivel-titulo">📊 Nivel 1 — Reporte general</div>'
@@ -52,14 +51,14 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
     with c1:
         st.download_button(
             "⬇️ General CSV", data=general_csv(df),
-            file_name=nombre_general(label, "csv"),
+            file_name=general_name(label, "csv"),
             mime="text/csv", width = "stretch",
             key=f"dl_gen_csv_{key_suffix}",
         )
     with c2:
         st.download_button(
             "⬇️ General Excel", data=general_excel(df),
-            file_name=nombre_general(label, "xlsx"),
+            file_name=general_name(label, "xlsx"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             width = "stretch",
             key=f"dl_gen_xlsx_{key_suffix}",
@@ -67,7 +66,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Nivel 2 — Por convenio
+    # Level 2 — Per agreement
     st.markdown(
         '<div class="nivel-header">'
         '<div class="nivel-titulo">🏥 Nivel 2 — Por convenio</div>'
@@ -75,22 +74,22 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
         '</div>',
         unsafe_allow_html=True,
     )
-    convenios = convenios_disponibles(df)
+    convenios = available_agreements(df)
     conv_sel = st.selectbox(
         "Selecciona el convenio", convenios, key=f"conv_desc_{key_suffix}"
     )
     c3, c4 = st.columns(2)
     with c3:
         st.download_button(
-            f"⬇️ {conv_sel} CSV", data=convenio_csv(df, conv_sel),
-            file_name=nombre_convenio_archivo(conv_sel, label, "csv"),
+            f"⬇️ {conv_sel} CSV", data=agreement_csv(df, conv_sel),
+            file_name=name_agreement_file(conv_sel, label, "csv"),
             mime="text/csv", width = "stretch",
             key=f"dl_conv_csv_{key_suffix}",
         )
     with c4:
         st.download_button(
-            f"⬇️ {conv_sel} Excel", data=convenio_excel(df, conv_sel),
-            file_name=nombre_convenio_archivo(conv_sel, label, "xlsx"),
+            f"⬇️ {conv_sel} Excel", data=agreement_excel(df, conv_sel),
+            file_name=name_agreement_file(conv_sel, label, "xlsx"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             width = "stretch",
             key=f"dl_conv_xlsx_{key_suffix}",
@@ -98,7 +97,7 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Nivel 3 — Por tipo de base
+    # Level 3 — By base type
     st.markdown(
         '<div class="nivel-header">'
         '<div class="nivel-titulo">🗂️ Nivel 3 — Por tipo de base</div>'
@@ -113,15 +112,15 @@ def bloque_descargas(df: pd.DataFrame, label: str, key_suffix: str = ""):
     c5, c6 = st.columns(2)
     with c5:
         st.download_button(
-            f"⬇️ {tipo_sel} CSV", data=tipo_base_csv(df, tipo_sel),
-            file_name=nombre_tipo_base_archivo(tipo_sel, label, "csv"),
+            f"⬇️ {tipo_sel} CSV", data=base_type_csv(df, tipo_sel),
+            file_name=name_base_type_file(tipo_sel, label, "csv"),
             mime="text/csv", width = "stretch",
             key=f"dl_tipo_csv_{key_suffix}",
         )
     with c6:
         st.download_button(
-            f"⬇️ {tipo_sel} Excel", data=tipo_base_excel(df, tipo_sel),
-            file_name=nombre_tipo_base_archivo(tipo_sel, label, "xlsx"),
+            f"⬇️ {tipo_sel} Excel", data=base_type_excel(df, tipo_sel),
+            file_name=name_base_type_file(tipo_sel, label, "xlsx"),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             width = "stretch",
             key=f"dl_tipo_xlsx_{key_suffix}",
