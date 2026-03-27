@@ -1,19 +1,18 @@
 """Tab 'Billing Report' — report loading and cross-referencing with databases."""
 
 import streamlit as st
-import pandas as pd
 
 from core.billing_report import (
     read_report, kpis_report, save_report,
     load_report, info_save_report,
-    COL_CONCAT_CUPS, COL_CONCAT_SERVICIO, COLS_CRUCE_RESULTADO,
+    COLS_CRUCE_RESULTADO,
 )
-from core.cruce_informe import (
-    cruzar_bases_con_informe,
-    kpis_cruce_informe,
-    resumen_por_convenio,
-    resumen_por_tipo_base,
-    guardar_cruce_informe,
+from core.cross_billing_report import (
+    cross_bases_with_report,
+    crossing_kpis_report,
+    crossing_summary_by_agreement_report,
+    crossing_summary_by_base_type_report,
+    save_cross_report,
 )
 from core.exporter import (
     _excel, _csv, _safe_name,
@@ -160,7 +159,7 @@ def render_tab_billing_report():
                         st.error("❌ No se encontraron bases.")
                         return
                     df_informe = load_report()
-                    df_crossed = cruzar_bases_con_informe(
+                    df_crossed = cross_bases_with_report(
                         df_bases, df_informe, st.session_state.config
                     )
                     st.session_state["df_cruce_informe_resultado"] = df_crossed
@@ -197,7 +196,7 @@ def render_tab_billing_report():
             with st.spinner("Ejecutando cruce..."):
                 try:
                     df_informe = load_report()
-                    df_crossed = cruzar_bases_con_informe(
+                    df_crossed = cross_bases_with_report(
                         df_filtered2.copy(), df_informe, st.session_state.config
                     )
                     label = type_selected if type_selected != "Todos" else agreement_selected
@@ -216,7 +215,7 @@ def render_tab_billing_report():
     st.divider()
     st.subheader(f"📊 Resultados — {label}")
 
-    kci = kpis_cruce_informe(df_cross)
+    kci = crossing_kpis_report(df_cross)
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total",           f"{kci['total']:,}")
     k2.metric("✅ Facturados",   f"{kci['facturados']:,}")
@@ -226,7 +225,7 @@ def render_tab_billing_report():
     st.divider()
 
     st.subheader("🏥 Por convenio")
-    rc = resumen_por_convenio(df_cross)
+    rc = crossing_summary_by_agreement_report(df_cross)
     if not rc.empty:
         st.dataframe(rc.style.background_gradient(
             subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100),
@@ -235,7 +234,7 @@ def render_tab_billing_report():
     st.divider()
 
     st.subheader("🗂️ Por tipo de base")
-    rt = resumen_por_tipo_base(df_cross)
+    rt = crossing_summary_by_base_type_report(df_cross)
     if not rt.empty:
         st.dataframe(rt.style.background_gradient(
             subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=0, vmax=100),
@@ -270,7 +269,7 @@ def render_tab_billing_report():
                      use_container_width=True, key="btn_guardar_cruce_inf"):
             with st.spinner("Guardando..."):
                 try:
-                    path_saved = guardar_cruce_informe(df_cross, label)
+                    path_saved = save_cross_report(df_cross, label)
                     st.session_state.pop("df_cruce_informe_resultado", None)
                     st.success(f"✅ Guardado en `{path_saved}`.")
                     st.rerun()
@@ -304,8 +303,8 @@ def render_tab_billing_report():
             sheet_yes = sheet_yes.merge(df_inf_merge, on="llave_cruce_informe", how="left")
 
     sheets = {
-        "Resumen Convenio":  resumen_por_convenio(df_cross),
-        "Resumen Tipo Base": resumen_por_tipo_base(df_cross),
+        "Resumen Convenio":  crossing_summary_by_agreement_report(df_cross),
+        "Resumen Tipo Base": crossing_summary_by_base_type_report(df_cross),
         "Facturados":        sheet_yes,
         "No Facturados":     df_not[cols_no] if not df_not.empty else df_not,
     }
