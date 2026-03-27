@@ -1,9 +1,8 @@
-"""Configuración de página y estilos CSS."""
-
+"""Page settings and CSS styles."""
 import streamlit as st
 
 
-def configurar_pagina():
+def page_config():
     st.set_page_config(
         page_title="Control de Facturación",
         page_icon="🏥",
@@ -11,7 +10,7 @@ def configurar_pagina():
     )
 
 
-def aplicar_estilos():
+def page_styles():
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
