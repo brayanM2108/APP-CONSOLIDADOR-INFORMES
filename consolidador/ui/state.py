@@ -6,14 +6,14 @@ from pathlib import Path
 
 CONFIG_PATH = Path("config/config.json")
 
-MESES = {
+MONTHS = {
     "01": "Enero", "02": "Febrero", "03": "Marzo",
     "04": "Abril", "05": "Mayo", "06": "Junio",
     "07": "Julio", "08": "Agosto", "09": "Septiembre",
     "10": "Octubre", "11": "Noviembre", "12": "Diciembre",
 }
 
-LOGICAS = {
+LOGICAL = {
     "La celda tiene cualquier valor (no está vacía)": "tiene_valor",
     "Texto exacto (ej: FAC, SI, RADICADO)": "__texto__",
     "Contiene un número (ej: número de radicado)": "es_numero",
@@ -21,7 +21,7 @@ LOGICAS = {
 }
 
 
-def guardar_config(config: dict):
+def save_config(config: dict):
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(
         json.dumps(config, ensure_ascii=False, indent=2),
@@ -29,7 +29,7 @@ def guardar_config(config: dict):
     )
 
 
-def inicializar_estado():
+def inicializate_state():
     if "df_resultado" not in st.session_state:
         st.session_state.df_resultado = None
     if "mes_label" not in st.session_state:
