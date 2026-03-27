@@ -1,27 +1,24 @@
 """
-app.py
-Punto de entrada de la aplicación Streamlit.
-Delega toda la lógica de UI a los módulos en ui/.
+App
+Delegate all UI logic to the modules in ui/.
+Streamlit application entry point.
 """
 import streamlit as st
-from ui.estilos import configurar_pagina, aplicar_estilos
-from ui.estado import inicializar_estado
+from ui.styles import page_config, page_styles
+from ui.state import inicializate_state
 from ui.sidebar import render_sidebar
-from ui.tabs.tab_archivos import render_tab_archivos
-from ui.tabs.tab_cargar import render_tab_cargar
-from ui.tabs.tab_reporte import render_tab_reporte
-from ui.tabs.tab_facturado import render_tab_facturado
-from ui.tabs.tab_informe import render_tab_informe
+from ui.tabs.tab_files import render_tab_files
+from ui.tabs.tab_manual_load import render_tab_load
+from ui.tabs.tab_report import render_tab_report
+from ui.tabs.tab_billing import render_tab_billing
+from ui.tabs.tab_billing_report import render_tab_billing_report
 
-# ── Configuración inicial ────────────────────────────────────
-configurar_pagina()
-aplicar_estilos()
-inicializar_estado()
+page_config()
+page_styles()
+inicializate_state()
 
-# ── Sidebar ──────────────────────────────────────────────────
 render_sidebar()
 
-# ── Contenido principal ──────────────────────────────────────
 st.markdown(
     '<p class="titulo">🏥 Control de Facturación</p>',
     unsafe_allow_html=True,
@@ -36,21 +33,21 @@ if not st.session_state.config:
     st.info("👈 Crea los tipos de base en el panel izquierdo para comenzar.")
     st.stop()
 
-tab_archivos, tab_cargar, tab_reporte, tab_facturado, tab_informe = st.tabs([
+tab_files, tab_load, tab_report, tab_billing, tab_report_billing = st.tabs([
     "📂 Archivos del mes", "📁 Cargar manual", "📊 Reporte", "📋 Facturado", "🧾Informe Facturacion"
 ])
 
-with tab_archivos:
-    render_tab_archivos()
+with tab_files:
+    render_tab_files()
 
-with tab_cargar:
-    render_tab_cargar()
+with tab_load:
+    render_tab_load()
 
-with tab_reporte:
-    render_tab_reporte()
+with tab_report:
+    render_tab_report()
 
-with tab_facturado:
-    render_tab_facturado()
+with tab_billing:
+    render_tab_billing()
 
-with tab_informe:
-    render_tab_informe()
+with tab_report_billing:
+    render_tab_billing_report()
