@@ -1,19 +1,19 @@
 """
-watcher.py
-Responsabilidad: escanear la estructura de carpetas AÑO/CONVENIO/TIPO_BASE/archivo
-y detectar archivos nuevos vs ya procesados.
-No sabe nada de interfaz ni de procesamiento de datos.
+Watcher
+Responsibilities: Scan the folder structure YEAR/AGREEMENT/BASE_TYPE/file
+and detect new vs. processed files.
+No prior knowledge of user interfaces or data processing.
 """
 
 import json
+import re
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
-# ── Ruta del registro de procesados ─────────────────────────
-PROCESADOS_PATH = Path("config/procesados.json")
+PROCESSED_PATH = Path("config/procesados.json")
 
-MESES_NOMBRE = {
+MONTHS_NAME = {
     "ENERO": "01", "FEBRERO": "02", "MARZO": "03",
     "ABRIL": "04", "MAYO": "05", "JUNIO": "06",
     "JULIO": "07", "AGOSTO": "08", "SEPTIEMBRE": "09",
@@ -22,15 +22,15 @@ MESES_NOMBRE = {
 
 
 # ════════════════════════════════════════════════════════════
-# MODELO DE DATOS
+# DATA MODEL
 # ════════════════════════════════════════════════════════════
 
 @dataclass
-class ArchivoDetectado:
+class DetectedFile:
     ruta:        str
     nombre:      str
-    convenio:    str   # nombre de la carpeta convenio
-    tipo_carpeta:str   # nombre de la carpeta tipo_base
+    convenio:    str   # name of file agreement
+    tipo_carpeta:str   # name of file type_base
     tipo_base:   str   # tipo mapeado en config (puede estar vacío si no hay mapeo)
     mes:         str   # "01" a "12" detectado del nombre del archivo
     año:         int
@@ -39,75 +39,76 @@ class ArchivoDetectado:
 
 
 # ════════════════════════════════════════════════════════════
-# REGISTRO DE PROCESADOS
+# PROCESSED RECORD
 # ════════════════════════════════════════════════════════════
 
-def _cargar_procesados() -> dict:
-    """Carga el registro de archivos ya procesados."""
-    if PROCESADOS_PATH.exists():
+def _load_processed() -> dict:
+    """Load the log of already processed files."""
+    if PROCESSED_PATH.exists():
         try:
-            return json.loads(PROCESADOS_PATH.read_text(encoding="utf-8"))
+            return json.loads(PROCESSED_PATH.read_text(encoding="utf-8"))
         except Exception:
             return {}
     return {}
 
 
-def _guardar_procesados(procesados: dict):
-    """Persiste el registro de procesados."""
-    PROCESADOS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PROCESADOS_PATH.write_text(
+def _save_processed(procesados: dict):
+    """The record of those processed persists."""
+    PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROCESSED_PATH.write_text(
         json.dumps(procesados, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
 
-def _normalizar_ruta(ruta: str) -> str:
-    """Normaliza la ruta para comparación consistente entre OS.
-    Resuelve backslash vs slash, mayúsculas y rutas relativas."""
+def _normalize_root(ruta: str) -> str:
+    """Normalizes the path for consistent comparison across operating systems.
+     Resolves backslash vs. slash, case sensitivity, and relative paths."""
     return str(Path(ruta).resolve())
 
 
-def marcar_procesado(ruta: str, tipo_base: str):
-    """Marca un archivo como procesado con timestamp."""
+def mark_processed(ruta: str, tipo_base: str):
+    """Marks a file as processed with timestamp."""
     from datetime import datetime
-    procesados = _cargar_procesados()
-    procesados[_normalizar_ruta(ruta)] = {
+    processed = _load_processed()
+    processed[_normalize_root(ruta)] = {
         "tipo_base":    tipo_base,
         "procesado_el": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
-    _guardar_procesados(procesados)
+    _save_processed(processed)
 
 
-def desmarcar_procesado(ruta: str):
-    """Permite reprocesar un archivo quitándolo del registro."""
-    procesados = _cargar_procesados()
-    procesados.pop(_normalizar_ruta(ruta), None)
-    _guardar_procesados(procesados)
+def unmark_processed(ruta: str):
+    """Allows you to reprocess a file by removing it from the registry."""
+    procesados = _load_processed()
+    procesados.pop(_normalize_root(ruta), None)
+    _save_processed(procesados)
 
 
 # ════════════════════════════════════════════════════════════
-# DETECCIÓN DE MES EN NOMBRE DE ARCHIVO
+# MONTH DETECTION IN FILE NAME
 # ════════════════════════════════════════════════════════════
 
-def _detectar_mes(nombre_archivo: str) -> str:
+def _detect_month(nombre_archivo: str) -> str:
+
     """
-    Busca el nombre de un mes en el nombre del archivo.
+    Searches for the name of a month within the file name.
     BASE_CABEZOTE_CAPITALSALUD_DICIEMBRE_2025.xlsx → "12"
-    Retorna "" si no encuentra ninguno.
+    Returns "" if none is found.
     """
     nombre_upper = nombre_archivo.upper()
-    for nombre_mes, numero in MESES_NOMBRE.items():
+    for nombre_mes, numero in MONTHS_NAME.items():
         if nombre_mes in nombre_upper:
             return numero
     return ""
 
 
-def _detectar_año(nombre_archivo: str, carpeta_año: str) -> int:
+def _detect_year(nombre_archivo: str, carpeta_año: str) -> int:
     """
-    Intenta extraer el año del nombre del archivo.
-    Si no lo encuentra, usa el nombre de la carpeta raíz.
+    Try to extract the year from the filename.
+    If you can't find it, use the root folder name.
     """
-    import re
+
     años = re.findall(r"20\d{2}", nombre_archivo)
     if años:
         return int(años[-1])
@@ -118,72 +119,69 @@ def _detectar_año(nombre_archivo: str, carpeta_año: str) -> int:
 
 
 # ════════════════════════════════════════════════════════════
-# ESCANEO DE CARPETAS
+# SCAN OF FILES
 # ════════════════════════════════════════════════════════════
 
-def escanear(
-    carpeta_raiz: str,
-    mes_filtro: str,          # "01" a "12", filtra por mes
-    mapeo_carpeta_tipo: dict, # {"CABEZOTE": "CAPITALSALUD - Cabezote", ...}
-) -> list[ArchivoDetectado]:
+def scan(
+        carpeta_raiz: str,
+        month_filter: str,
+        map_type_file: dict,
+) -> list[DetectedFile]:
     """
-    Escanea la estructura AÑO/CONVENIO/TIPO_BASE/*.xlsx
-    y retorna lista de archivos del mes indicado.
-
-    mapeo_carpeta_tipo: sección "carpeta_tipo_base" del config.json
+    Scans the structure YEAR/AGREEMENT/BASE_TYPE/*.xlsx
+    and returns a list of files for the specified month.
+    mapping_folder_type: "base_type_folder" section of config.json
     """
-    raiz      = Path(carpeta_raiz)
-    procesados= _cargar_procesados()
-    archivos  = []
+    root = Path(carpeta_raiz)
+    processed = _load_processed()
+    detected_files = []
 
-    if not raiz.exists():
+    if not root.exists():
         return []
 
-    # Estructura: AÑO / CONVENIO / TIPO_BASE / archivo.xlsx
-    for carpeta_año in sorted(raiz.iterdir()):
-        if not carpeta_año.is_dir():
+    # STRUCTURE: YEAR / AGREEMENT / BASE_TYPE / file.xlsx
+    for year_dir in sorted(root.iterdir()):
+        if not year_dir.is_dir():
             continue
 
-        for carpeta_convenio in sorted(carpeta_año.iterdir()):
-            if not carpeta_convenio.is_dir():
+        for agreement_dir in sorted(year_dir.iterdir()):
+            if not agreement_dir.is_dir():
                 continue
 
-            for carpeta_tipo in sorted(carpeta_convenio.iterdir()):
-                if not carpeta_tipo.is_dir():
+            for type_dir in sorted(agreement_dir.iterdir()):
+                if not type_dir.is_dir():
                     continue
 
-                for archivo in sorted(carpeta_tipo.glob("*.xlsx")) :
-                    mes_archivo = _detectar_mes(archivo.name)
+                for file_path in sorted(type_dir.glob("*.xlsx")):
+                    month_file = _detect_month(file_path.name)
 
-                    # Filtrar por mes seleccionado
-                    if mes_archivo != mes_filtro:
+                    if month_file != month_filter:
                         continue
 
-                    ruta_str     = _normalizar_ruta(str(archivo))
-                    tipo_carpeta = carpeta_tipo.name
-                    tipo_base    = mapeo_carpeta_tipo.get(tipo_carpeta, "")
-                    ya_procesado = ruta_str in procesados
+                    route_str = _normalize_root(str(file_path))
+                    type_folder_name = type_dir.name
+                    base_type = map_type_file.get(type_folder_name, "")
+                    already_processed = route_str in processed
 
-                    archivos.append(ArchivoDetectado(
-                        ruta         = ruta_str,
-                        nombre       = archivo.name,
-                        convenio     = carpeta_convenio.name,
-                        tipo_carpeta = tipo_carpeta,
-                        tipo_base    = tipo_base,
-                        mes          = mes_archivo,
-                        año          = _detectar_año(archivo.name, carpeta_año.name),
-                        procesado    = ya_procesado,
-                        procesado_el = procesados.get(ruta_str, {}).get("procesado_el", ""),
+                    detected_files.append(DetectedFile(
+                        ruta         = route_str,
+                        nombre       = file_path.name,
+                        convenio     = agreement_dir.name,
+                        tipo_carpeta = type_folder_name,
+                        tipo_base    = base_type,
+                        mes          = month_file,
+                        año          = _detect_year(file_path.name, year_dir.name),
+                        procesado    = already_processed,
+                        procesado_el = processed.get(route_str, {}).get("procesado_el", ""),
                     ))
 
-    return archivos
+    return detected_files
 
 
-def archivos_nuevos(archivos: list[ArchivoDetectado]) -> list[ArchivoDetectado]:
-    """Filtra solo los archivos no procesados."""
-    return [a for a in archivos if not a.procesado]
+def new_files(files_list: list[DetectedFile]) -> list[DetectedFile]:
+    """Filter only the unprocessed files."""
+    return [a for a in files_list if not a.procesado]
 
-
-def archivos_procesados(archivos: list[ArchivoDetectado]) -> list[ArchivoDetectado]:
-    """Filtra solo los archivos ya procesados."""
-    return [a for a in archivos if a.procesado]
+def files_processed(files_list: list[DetectedFile]) -> list[DetectedFile]:
+    """Filter only the files that have already been processed."""
+    return [a for a in files_list if a.procesado]
