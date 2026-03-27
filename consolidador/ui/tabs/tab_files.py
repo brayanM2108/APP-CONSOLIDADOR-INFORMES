@@ -1,85 +1,85 @@
-"""Tab 'Archivos del mes' — escaneo automático de carpeta."""
+"""Tab 'Files of the month' — automatic folder scan."""
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from ui.estado import MESES, guardar_config
-from core.procesador import procesar_base
+from ui.state import MONTHS
+from core.processor import procces_base
 from core.watcher import (
-    escanear, archivos_nuevos, archivos_procesados,
-    marcar_procesado, desmarcar_procesado,
+    scan, new_files, files_processed,
+    mark_processed, unmark_processed,
 )
-from core.exportador import (
-    guardar_parquet, cargar_todos_parquet, eliminar_archivo_de_parquet,
+from core.exporter import (
+    save_parquet, load_all_parquet, delete_files_from_parquet,
 )
 
 
-def render_tab_archivos():
+def render_tab_files():
     st.subheader("Archivos del mes")
 
-    carpeta_raiz = st.session_state.get("carpeta_datos", "")
-    if not carpeta_raiz:
+    route_file = st.session_state.get("carpeta_datos", "")
+    if not route_file:
         st.info("👈 Define la carpeta raíz de datos en el panel izquierdo.")
 
-    mes_w = _selector_mes()
-    archivos_scan = st.session_state.get("archivos_escaneados", [])
+    mes_w = _select_month()
+    scan_files = st.session_state.get("archivos_escaneados", [])
 
     if "archivos_escaneados" not in st.session_state:
         st.info("📂 Presiona **Escanear** para detectar archivos del mes.")
-    elif not archivos_scan:
+    elif not scan_files:
         st.warning(
-            f"⚠️ No se encontraron archivos de **{MESES[mes_w]}** en `{carpeta_raiz}`."
+            f"⚠️ No se encontraron archivos de **{MONTHS[mes_w]}** en `{route_file}`."
         )
     else:
-        _mostrar_archivos(archivos_scan, mes_w, carpeta_raiz)
+        _show_files(scan_files, mes_w, route_file)
 
     st.divider()
-    _bases_consolidadas()
+    _consolidated_bases()
 
 
-def _selector_mes():
+def _select_month():
     w1, w2 = st.columns(2)
     with w1:
         mes_w = st.selectbox(
-            "Mes", list(MESES.keys()),
+            "Mes", list(MONTHS.keys()),
             index=datetime.now().month - 1,
-            format_func=lambda x: MESES[x],
+            format_func=lambda x: MONTHS[x],
             key="mes_watcher",
         )
     with w2:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔍 Escanear carpeta", width = "stretch"):
             carpeta_raiz = st.session_state.get("carpeta_datos", "")
-            st.session_state["archivos_escaneados"] = escanear(
+            st.session_state["archivos_escaneados"] = scan(
                 carpeta_raiz, mes_w,
                 st.session_state.config.get("carpeta_tipo_base", {}),
             )
     return mes_w
 
 
-def _mostrar_archivos(archivos_scan, mes_w, carpeta_raiz):
-    nuevos = archivos_nuevos(archivos_scan)
-    procesados = archivos_procesados(archivos_scan)
+def _show_files(scan_files, mes_w, carpeta_raiz):
+    new = new_files(scan_files)
+    processed = files_processed(scan_files)
 
-    if not nuevos and not procesados:
+    if not new and not processed:
         st.warning("⚠️ No se encontraron archivos para este mes.")
         return
 
-    if not nuevos:
-        st.success(f"✅ Todos los archivos de **{MESES[mes_w]}** ya fueron procesados.")
+    if not new:
+        st.success(f"✅ Todos los archivos de **{MONTHS[mes_w]}** ya fueron procesados.")
     else:
         st.info(
-            f"🆕 **{len(nuevos)}** archivo(s) nuevo(s) · "
-            f"✅ **{len(procesados)}** ya procesado(s)"
+            f"🆕 **{len(new)}** archivo(s) nuevo(s) · "
+            f"✅ **{len(processed)}** ya procesado(s)"
         )
-        _archivos_nuevos(nuevos, mes_w, carpeta_raiz)
+        _new_files(new, mes_w, carpeta_raiz)
 
-    if procesados:
-        _archivos_procesados(procesados, mes_w, carpeta_raiz)
+    if processed:
+        _files_processed(processed, mes_w, carpeta_raiz)
 
 
-def _archivos_nuevos(nuevos, mes_w, carpeta_raiz):
+def _new_files(nuevos, mes_w, carpeta_raiz):
     st.markdown("#### 🆕 Archivos nuevos")
     tipos_disponibles_w = ["— Selecciona —"] + [
         k for k in st.session_state.config.keys() if k != "carpeta_tipo_base"
@@ -106,10 +106,10 @@ def _archivos_nuevos(nuevos, mes_w, carpeta_raiz):
                 seleccionados.append((arch, tipo_sel_w))
 
     st.divider()
-    _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz)
+    _buttons_verify_process(seleccionados, mes_w, carpeta_raiz)
 
 
-def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
+def _buttons_verify_process(seleccionados, mes_w, carpeta_raiz):
     puede_procesar_w = len(seleccionados) > 0
     col_v, col_p = st.columns(2)
 
@@ -125,7 +125,7 @@ def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
                 config_base = st.session_state.config.get(tipo_base_w, {})
                 try:
                     df_raw = pd.read_excel(arch.ruta)
-                    df_proc, warns = procesar_base(
+                    df_proc, warns = procces_base(
                         df_raw, config_base,
                         arch.nombre, tipo_base_w, arch.mes, arch.año,
                     )
@@ -152,10 +152,10 @@ def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
             sels = st.session_state.pop("seleccionados_w")
 
             for arch, tipo_base_w in sels:
-                marcar_procesado(arch.ruta, tipo_base_w)
+                mark_processed(arch.ruta, tipo_base_w)
 
             df_nuevos = pd.concat(dfs, ignore_index=True)
-            mes_nuevo = f"{MESES[mes_w]}_{sels[0][0].año}"
+            mes_nuevo = f"{MONTHS[mes_w]}_{sels[0][0].año}"
 
             if (
                 st.session_state.df_resultado is not None
@@ -172,18 +172,17 @@ def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
             total = len(st.session_state.df_resultado)
 
             try:
-                guardar_parquet(st.session_state.df_resultado, mes_nuevo)
+                save_parquet(st.session_state.df_resultado, mes_nuevo)
                 st.success(f"✅ {total:,} registros guardados. Ve a **📊 Reporte**.")
             except Exception:
                 st.success(f"✅ {total:,} registros procesados. Ve a **📊 Reporte**.")
 
-            st.session_state["archivos_escaneados"] = escanear(
+            st.session_state["archivos_escaneados"] = scan(
                 carpeta_raiz, mes_w,
                 st.session_state.config.get("carpeta_tipo_base", {}),
             )
             st.rerun()
 
-    # Resultado de verificación
     if st.session_state.get("advertencias_w"):
         with st.expander(f"⚠️ {len(st.session_state['advertencias_w'])} advertencia(s)"):
             for w in st.session_state["advertencias_w"]:
@@ -196,7 +195,7 @@ def _botones_verificar_procesar(seleccionados, mes_w, carpeta_raiz):
                 st.markdown(f"- {e}")
 
 
-def _archivos_procesados(procesados, mes_w, carpeta_raiz):
+def _files_processed(procesados, mes_w, carpeta_raiz):
     with st.expander(f"✅ {len(procesados)} ya procesado(s)"):
         for arch in procesados:
             col_i, col_r = st.columns([4, 2])
@@ -205,27 +204,26 @@ def _archivos_procesados(procesados, mes_w, carpeta_raiz):
                 st.caption(f"{arch.convenio} · {arch.procesado_el}")
             with col_r:
                 if st.button("↩️ Reprocesar", key=f"reproc_{arch.ruta}"):
-                    desmarcar_procesado(arch.ruta)
-                    st.session_state["archivos_escaneados"] = escanear(
+                    unmark_processed(arch.ruta)
+                    st.session_state["archivos_escaneados"] = scan(
                         carpeta_raiz, mes_w,
                         st.session_state.config.get("carpeta_tipo_base", {}),
                     )
                     st.rerun()
 
 
-def _bases_consolidadas():
+def _consolidated_bases():
     st.markdown("#### 📊 Bases consolidadas")
-    df_total = cargar_todos_parquet()
+    df_total = load_all_parquet()
 
     if df_total is None:
         st.caption("Aún no hay bases guardadas en el historial.")
         return
 
-    # ── Filtro de mes ──────────────────────────────────────
     meses_disponibles = sorted(df_total["archivo_origen"].apply(
-        lambda x: x  # placeholder
+        lambda x: x
     ))
-    # Obtener meses únicos desde el DataFrame
+
     if "mes" in df_total.columns and "año" in df_total.columns:
         df_total["_mes_label"] = df_total["año"].astype(str) + " - " + df_total["mes"].astype(str).str.zfill(2)
         meses_unicos = ["Todos"] + sorted(df_total["_mes_label"].unique().tolist())
@@ -237,7 +235,6 @@ def _bases_consolidadas():
     with col_mes:
         mes_filtro = st.selectbox("Mes", meses_unicos, key="bases_mes_filtro")
 
-    # Filtrar por mes antes de poblar el selector de convenio
     if mes_filtro != "Todos":
         df_filtrado_mes = df_total[df_total["_mes_label"] == mes_filtro]
     else:
@@ -248,13 +245,11 @@ def _bases_consolidadas():
     with col_conv:
         conv_filtro = st.selectbox("Convenio", convenios_total, key="bases_conv_filtro")
 
-    # Aplicar filtro de convenio
     if conv_filtro != "Todos":
         df_conv = df_filtrado_mes[df_filtrado_mes["nombre_convenio"] == conv_filtro]
     else:
         df_conv = df_filtrado_mes
 
-    # Limpiar columna auxiliar
     df_total.drop(columns=["_mes_label"], inplace=True, errors="ignore")
     df_conv = df_conv.drop(columns=["_mes_label"], errors="ignore")
 
@@ -265,7 +260,6 @@ def _bases_consolidadas():
     st.caption(f"{len(archivos_conv)} archivo(s) consolidado(s) para {label_filtro}{label_mes}:")
 
 
-    # ── Selección múltiple para borrado rápido ────────────────
     def _key_sel(nombre: str) -> str:
         safe = (
             nombre.replace(" ", "_")
@@ -276,7 +270,6 @@ def _bases_consolidadas():
         )
         return f"bulk_del_{safe}"
 
-    # Limpiar selección en un rerun posterior (antes de instanciar widgets)
     if st.session_state.get("bulk_clear_pending", False):
         for k in list(st.session_state.keys()):
             if k.startswith("bulk_del_"):
@@ -302,13 +295,12 @@ def _bases_consolidadas():
             if st.button("🗑️", key=f"del_{a}", help=f"Eliminar {a}"):
                 st.session_state[f"confirm_del_{a}"] = True
 
-        # Borrado individual (se mantiene)
         if st.session_state.get(f"confirm_del_{a}"):
             st.warning(f"⚠️ ¿Eliminar **{a}** del Parquet permanentemente?")
             col_si, col_no = st.columns(2)
             with col_si:
                 if st.button("✅ Sí, eliminar", key=f"si_{a}", type="primary", width = "stretch"):
-                    resultado = eliminar_archivo_de_parquet(a)
+                    resultado = delete_files_from_parquet(a)
                     if resultado["error"]:
                         st.error(f"Error: {resultado['error']}")
                     else:
@@ -330,7 +322,6 @@ def _bases_consolidadas():
                     st.session_state.pop(f"confirm_del_{a}", None)
                     st.rerun()
 
-    # ── Acción masiva ────────────────────────────────────────
     st.divider()
     col_b1, col_b2 = st.columns([2, 1])
 
@@ -359,7 +350,7 @@ def _bases_consolidadas():
                 errores = []
 
                 for nombre_archivo in seleccionados:
-                    resultado = eliminar_archivo_de_parquet(nombre_archivo)
+                    resultado = delete_files_from_parquet(nombre_archivo)
                     if resultado["error"]:
                         errores.append(f"{nombre_archivo}: {resultado['error']}")
                     else:
@@ -367,7 +358,6 @@ def _bases_consolidadas():
                         for m in resultado["meses_afectados"]:
                             meses_afectados.add(m)
 
-                # Limpiar en memoria (df_resultado actual)
                 if st.session_state.df_resultado is not None and seleccionados:
                     df_actual = st.session_state.df_resultado
                     df_filtrado = df_actual[
@@ -375,7 +365,6 @@ def _bases_consolidadas():
                     ].reset_index(drop=True)
                     st.session_state.df_resultado = None if df_filtrado.empty else df_filtrado
 
-                # Pedir limpieza de checkboxes para el siguiente rerun
                 st.session_state["bulk_clear_pending"] = True
 
                 st.session_state["confirm_bulk_delete"] = False
