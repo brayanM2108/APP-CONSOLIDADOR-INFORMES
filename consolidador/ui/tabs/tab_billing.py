@@ -9,11 +9,11 @@ from core.billing import (
     info_facturado_guardado,
     cargar_facturado,
 )
-from core.cruce import (
-    cruzar_bases_con_facturado,
-    kpis_cruce,
-    resumen_cruce_por_convenio,
-    resumen_cruce_por_tipo_base,
+from core.cross_billing import (
+    cross_bases_with_billed,
+    crossing_kpis,
+    crossing_summary_by_agreement,
+    crossing_summary_by_base_type,
 )
 
 from core.exporter import (
@@ -168,7 +168,7 @@ def render_tab_billing():
                     if df_fact is None:
                         st.error("❌ No se pudo cargar el facturado guardado.")
                         return
-                    df_crossed = cruzar_bases_con_facturado(
+                    df_crossed = cross_bases_with_billed(
                         df_bases, df_fact, st.session_state.config
                     )
                     st.session_state["df_cruce_resultado"] = df_crossed
@@ -222,7 +222,7 @@ def render_tab_billing():
                         st.error("❌ No se pudo cargar el facturado guardado.")
                         return
 
-                    df_crossed = cruzar_bases_con_facturado(
+                    df_crossed = cross_bases_with_billed(
                         df_bases_to_cross, df_fact, st.session_state.config
                     )
                     st.session_state["df_cruce_resultado"] = df_crossed
@@ -240,7 +240,7 @@ def render_tab_billing():
     st.divider()
     st.subheader(f"📊 Resultados del cruce — {cross_label}")
 
-    kc = kpis_cruce(df_cross)
+    kc = crossing_kpis(df_cross)
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total registros", f"{kc['total']:,}")
     k2.metric("✅ Facturados", f"{kc['facturados']:,}")
@@ -250,7 +250,7 @@ def render_tab_billing():
     st.divider()
 
     st.subheader("🏥 Por convenio")
-    rc = resumen_cruce_por_convenio(df_cross)
+    rc = crossing_summary_by_agreement(df_cross)
     if not rc.empty:
         st.dataframe(
             rc.style.background_gradient(
@@ -262,7 +262,7 @@ def render_tab_billing():
     st.divider()
 
     st.subheader("🗂️ Por tipo de base")
-    rt = resumen_cruce_por_tipo_base(df_cross)
+    rt = crossing_summary_by_base_type(df_cross)
     if not rt.empty:
         st.dataframe(
             rt.style.background_gradient(
@@ -307,8 +307,8 @@ def render_tab_billing():
     ):
         with st.spinner("Guardando..."):
             try:
-                from core.cruce import guardar_cruce
-                ruta = guardar_cruce(df_cross, cross_label)
+                from core.cross_billing import save_crossing
+                ruta = save_crossing(df_cross, cross_label)
                 st.session_state.pop("df_cruce_resultado", None)
                 st.success(f"✅ Cruce guardado en `{ruta}`. Las bases originales no fueron modificadas.")
                 st.rerun()
@@ -350,12 +350,12 @@ def render_tab_billing():
             ]
 
             if df_fact_loaded is not None and not df_billed.empty:
-                from core.cruce import _construir_llave, LLAVE_FACTURADO_DEFAULT, COL_CUPS_FACTURADO
+                from core.cross_billing import _construct_key, LLAVE_FACTURADO_DEFAULT, COL_CUPS_FACTURADO
                 df_fact_active = df_fact_loaded[df_fact_loaded["_estado_factura"] == "Activo"].copy()
                 cols_llave_fact = list(LLAVE_FACTURADO_DEFAULT)
                 if COL_CUPS_FACTURADO in df_fact_active.columns:
                     cols_llave_fact.append(COL_CUPS_FACTURADO)
-                df_fact_active["llave_cruce"] = _construir_llave(df_fact_active, cols_llave_fact)
+                df_fact_active["llave_cruce"] = _construct_key(df_fact_active, cols_llave_fact)
 
                 cols_fact_disp = [c for c in COLS_FACT if c in df_fact_active.columns]
                 df_fact_merge = df_fact_active[["llave_cruce"] + cols_fact_disp].drop_duplicates("llave_cruce")
@@ -371,14 +371,14 @@ def render_tab_billing():
 
             df_fact_loaded = cargar_facturado()
             if df_fact_loaded is not None and not df_no_fact_export.empty:
-                from core.cruce import _construir_llave, LLAVE_FACTURADO_DEFAULT, COL_CUPS_FACTURADO
+                from core.cross_billing import _construct_key, LLAVE_FACTURADO_DEFAULT, COL_CUPS_FACTURADO
 
                 df_fact_all = df_fact_loaded.copy()
                 cols_llave_fact = list(LLAVE_FACTURADO_DEFAULT)
                 if COL_CUPS_FACTURADO in df_fact_all.columns:
                     cols_llave_fact.append(COL_CUPS_FACTURADO)
 
-                df_fact_all["llave_cruce"] = _construir_llave(df_fact_all, cols_llave_fact)
+                df_fact_all["llave_cruce"] = _construct_key(df_fact_all, cols_llave_fact)
 
                 cols_fact_no_fact = [c for c in ["FACTURA", "_estado_factura"] if c in df_fact_all.columns]
                 df_fact_merge_nf = df_fact_all[["llave_cruce"] + cols_fact_no_fact].drop_duplicates("llave_cruce")
@@ -389,8 +389,8 @@ def render_tab_billing():
                                                  c in df_no_fact_export.columns]
 
             hojas = {
-                "Resumen Convenio": resumen_cruce_por_convenio(df_cross),
-                "Resumen Tipo Base": resumen_cruce_por_tipo_base(df_cross),
+                "Resumen Convenio": crossing_summary_by_agreement(df_cross),
+                "Resumen Tipo Base": crossing_summary_by_base_type(df_cross),
                 "Facturados": df_sheet_billed,
                 "No Facturados": df_no_fact_export[cols_no_fact_final] if not df_no_fact_export.empty else df_no_fact_export,
             }
